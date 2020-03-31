@@ -2,11 +2,13 @@
 
 ## Warning
 
-This package is a work in progress. Don't use it yet. Its import path will change.
+This package is a work in progress. Don't use it yet.
 
 ## What
 
 This is a package containing a new IP address type for Go.
+
+See its docs: https://godoc.org/inet.af/netaddr
 
 ## Motivation
 
