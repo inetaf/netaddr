@@ -3,9 +3,12 @@
 // license that can be found in the LICENSE file.
 
 // Package netaddr contains an IP address type.
+//
+// This is a work in progress. See https://github.com/inetaf/netaddr for background.
 package netaddr
 
 import (
+	"errors"
 	"fmt"
 	"net"
 )
@@ -16,14 +19,13 @@ import (
 //   netaddr.IP: 16 byte interface + {4, 16, 24} = 20, 32, 40 bytes + zone length
 
 // IP represents an IPv4 or IPv6 address (with or without a scoped
-// addressing zone), similar to Go's net.IPAddr.
+// addressing zone), similar to Go's net.IP or net.IPAddr.
 //
-// Unlike net.IPAddr, is a comparable value type (it supports == and can be a map key), and it's immutable. It's
-// memory representation ranges from 20 to 40 bytes, depending on
-// whether the underlying adddress is IPv4, IPv6, or IPv6 with a zone.
-//
-// Being a comparable value type, it supports == and being used as a
-// map key.
+// Unlike net.IP or net.IPAddr, the netaddr.IP is a comparable value
+// type (it supports == and can be a map key) and is immutable.
+// Its memory representation ranges from 20 to 40 bytes, depending on
+// whether the underlying adddress is IPv4, IPv6, or IPv6 with a
+// zone. (This is smaller than the standard library's 28 to 56 bytes)
 type IP struct {
 	ipImpl
 }
@@ -85,12 +87,58 @@ func ParseIP(s string) (IP, error) {
 }
 
 // Is4 reports whether ip is an IPv4 address.
-func (ip IP) Is4() bool { return ip.ipImpl.is4() }
+//
+// TODO: decide/clarify the behavior for IPv4-mapped IPv6 addresses.
+// They have different representations and are not equal with ==, but
+// should a 4-in-6 address be Is4? Currently it's not. Maybe add As4?
+// Go treats them differently (https://github.com/golang/go/issues/29146#issuecomment-454903818)
+// but https://github.com/golang/go/issues/37921 requests more visibility into distinguishing them.
+func (ip IP) Is4() bool {
+	if ip.ipImpl == nil {
+		return false
+	}
+	return ip.ipImpl.is4()
+}
 
 // Is6 reports whether ip is an IPv6 address.
-func (ip IP) Is6() bool { return ip.ipImpl.is6() }
+//
+// TODO: see same TODO for Is4.
+func (ip IP) Is6() bool {
+	if ip.ipImpl == nil {
+		return false
+	}
+	return ip.ipImpl.is6()
+}
 
 // String returns the string representation of ip.
 func (ip IP) String() string {
+	if ip.ipImpl == nil {
+		return "invalid IP"
+	}
 	return ip.ipImpl.String()
+}
+
+// MarshalText implements the encoding.TextMarshaler interface,
+// The encoding is the same as returned by String, with one exception:
+// If ip is the zero value, the encoding is the empty string.
+func (ip IP) MarshalText() ([]byte, error) {
+	if ip.ipImpl == nil {
+		return []byte(""), nil
+	}
+	return []byte(ip.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The IP address is expected in a form accepted by ParseIP.
+// It returns an error if *ip is not the IP zero value.
+func (ip *IP) UnmarshalText(text []byte) error {
+	if ip.ipImpl != nil {
+		return errors.New("netaddr: refusing to Unmarshal into non-zero IP")
+	}
+	if len(text) == 0 {
+		return nil
+	}
+	var err error
+	*ip, err = ParseIP(string(text))
+	return err
 }
