@@ -91,7 +91,7 @@ func ParseIP(s string) (IP, error) {
 // TODO: decide/clarify the behavior for IPv4-mapped IPv6 addresses.
 // They have different representations and are not equal with ==, but
 // should a 4-in-6 address be Is4? Currently it's not. Maybe add As4?
-// Go treats them differently (https://github.com/golang/go/issues/29146#issuecomment-454903818)
+// Go treats them as if they were the same (https://github.com/golang/go/issues/29146#issuecomment-454903818)
 // but https://github.com/golang/go/issues/37921 requests more visibility into distinguishing them.
 func (ip IP) Is4() bool {
 	if ip.ipImpl == nil {
