@@ -86,6 +86,37 @@ func ParseIP(s string) (IP, error) {
 	return IP{v6}, nil
 }
 
+// IPAddr returns the net.IPAddr representation of an IP. The returned value is
+// always non-nil, but the IPAddr.IP will be nil if ip is the zero value.
+// If ip contains a zone identifier, IPAddr.Zone is populated.
+func (ip IP) IPAddr() *net.IPAddr {
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		// Nothing to do.
+		return &net.IPAddr{}
+	case v4Addr:
+		return &net.IPAddr{
+			// Assume the caller wants the 4-byte representation.
+			IP: net.IPv4(ip[0], ip[1], ip[2], ip[3]).To4(),
+		}
+	case v6Addr:
+		b := make(net.IP, net.IPv6len)
+		copy(b, ip[:])
+
+		return &net.IPAddr{IP: b}
+	case v6AddrZone:
+		b := make(net.IP, net.IPv6len)
+		copy(b, ip.v6Addr[:])
+
+		return &net.IPAddr{
+			IP:   b,
+			Zone: ip.zone,
+		}
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
 // Is4 reports whether ip is an IPv4 address.
 //
 // TODO: decide/clarify the behavior for IPv4-mapped IPv6 addresses.

@@ -4,7 +4,11 @@
 
 package netaddr
 
-import "testing"
+import (
+	"net"
+	"reflect"
+	"testing"
+)
 
 func TestParseString(t *testing.T) {
 	tests := []string{
@@ -33,4 +37,57 @@ func TestParseString(t *testing.T) {
 
 		})
 	}
+}
+
+func TestIPIPAddr(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   IP
+		ipa  *net.IPAddr
+	}{
+		{
+			name: "nil",
+			ipa:  &net.IPAddr{},
+		},
+		{
+			name: "v4Addr",
+			ip:   mustIP("192.0.2.1"),
+			ipa: &net.IPAddr{
+				IP: net.IPv4(192, 0, 2, 1).To4(),
+			},
+		},
+		{
+			name: "v6Addr",
+			ip:   mustIP("2001:db8::1"),
+			ipa: &net.IPAddr{
+				IP: net.ParseIP("2001:db8::1"),
+			},
+		},
+		{
+			name: "v6AddrZone",
+			ip:   mustIP("fe80::1%eth0"),
+			ipa: &net.IPAddr{
+				IP:   net.ParseIP("fe80::1"),
+				Zone: "eth0",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.ip.IPAddr()
+			if !reflect.DeepEqual(tt.ipa, got) {
+				t.Errorf("IPAddr = %+v; want %+v", got, tt.ipa)
+			}
+		})
+	}
+}
+
+func mustIP(s string) IP {
+	ip, err := ParseIP(s)
+	if err != nil {
+		panic(err)
+	}
+
+	return ip
 }
