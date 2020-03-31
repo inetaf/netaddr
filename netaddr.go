@@ -5,7 +5,7 @@
 // Package netaddr contains an IP address type.
 //
 // This is a work in progress. See https://github.com/inetaf/netaddr for background.
-package netaddr
+package netaddr // import "inet.af/netaddr"
 
 import (
 	"errors"
