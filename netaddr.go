@@ -95,10 +95,7 @@ func (ip IP) IPAddr() *net.IPAddr {
 		// Nothing to do.
 		return &net.IPAddr{}
 	case v4Addr:
-		return &net.IPAddr{
-			// Assume the caller wants the 4-byte representation.
-			IP: net.IPv4(ip[0], ip[1], ip[2], ip[3]).To4(),
-		}
+		return &net.IPAddr{IP: net.IP{ip[0], ip[1], ip[2], ip[3]}}
 	case v6Addr:
 		b := make(net.IP, net.IPv6len)
 		copy(b, ip[:])
