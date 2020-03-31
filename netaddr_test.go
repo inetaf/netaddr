@@ -83,6 +83,69 @@ func TestIPIPAddr(t *testing.T) {
 	}
 }
 
+func TestIPProperties(t *testing.T) {
+	// TODO: expand test with more Is* property checks.
+
+	var (
+		nilIP IP
+
+		unicast4     = mustIP("192.0.2.1")
+		unicast6     = mustIP("2001:db::1")
+		unicastZone6 = mustIP("fe80::1%eth0")
+
+		multicast4     = mustIP("224.0.0.1")
+		multicast6     = mustIP("ff02::1")
+		multicastZone6 = mustIP("ff02::1%eth0")
+	)
+
+	tests := []struct {
+		name      string
+		ip        IP
+		multicast bool
+	}{
+		{
+			name: "nil",
+			ip:   nilIP,
+		},
+		{
+			name: "unicast v4Addr",
+			ip:   unicast4,
+		},
+		{
+			name: "unicast v6Addr",
+			ip:   unicast6,
+		},
+		{
+			name: "unicast v6AddrZone",
+			ip:   unicastZone6,
+		},
+		{
+			name:      "multicast v4Addr",
+			ip:        multicast4,
+			multicast: true,
+		},
+		{
+			name:      "multicast v6Addr",
+			ip:        multicast6,
+			multicast: true,
+		},
+		{
+			name:      "multicast v6AddrZone",
+			ip:        multicastZone6,
+			multicast: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			multicast := tt.ip.IsMulticast()
+			if multicast != tt.multicast {
+				t.Errorf("IsMulticast = %v; want %v", multicast, tt.multicast)
+			}
+		})
+	}
+}
+
 func mustIP(s string) IP {
 	ip, err := ParseIP(s)
 	if err != nil {

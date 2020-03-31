@@ -138,6 +138,24 @@ func (ip IP) Is6() bool {
 	return ip.ipImpl.is6()
 }
 
+// IsMulticast reports whether ip is a multicast address. If ip is the zero
+// value, it will return false.
+func (ip IP) IsMulticast() bool {
+	// See: https://en.wikipedia.org/wiki/Multicast_address.
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return false
+	case v4Addr:
+		return ip[0]&0xf0 == 0xe0
+	case v6Addr:
+		return ip[0] == 0xff
+	case v6AddrZone:
+		return ip.v6Addr[0] == 0xff
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
 // String returns the string representation of ip.
 func (ip IP) String() string {
 	if ip.ipImpl == nil {
