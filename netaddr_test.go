@@ -16,8 +16,10 @@ func TestParseString(t *testing.T) {
 	tests := []string{
 		"1.2.3.4",
 		"0.0.0.0",
+		"::",
 		"::1",
 		"fe80::1cc0:3e8c:119f:c2e1%ens18",
+		"::ffff:c000:1234",
 	}
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
@@ -36,7 +38,6 @@ func TestParseString(t *testing.T) {
 			if s != back {
 				t.Errorf("String = %q; want %q", back, s)
 			}
-
 		})
 	}
 }
@@ -195,6 +196,30 @@ func TestLess(t *testing.T) {
 	want := `[invalid IP 1.2.3.4 8.8.8.8 ::1 ::1%foo ::2]`
 	if got != want {
 		t.Errorf("unexpected sort\n got: %s\nwant: %s\n", got, want)
+	}
+}
+
+func TestIs4In6(t *testing.T) {
+	tests := []struct {
+		ip        IP
+		want      bool
+		wantUnmap IP
+	}{
+		{IP{}, false, IP{}},
+		{mustIP("::ffff:c000:0280"), true, mustIP("192.0.2.128")},
+		{mustIP("::fffe:c000:0280"), false, mustIP("::fffe:c000:0280")},
+		{mustIP("::1"), false, mustIP("::1")},
+		{mustIP("1.2.3.4"), false, mustIP("1.2.3.4")},
+	}
+	for _, tt := range tests {
+		got := tt.ip.Is4in6()
+		if got != tt.want {
+			t.Errorf("is4in6(%q) = %v; want %v", tt.ip, got, tt.want)
+		}
+		u := tt.ip.Unmap()
+		if u != tt.wantUnmap {
+			t.Errorf("Unmap(%v) = %v; want %v", tt.ip, u, tt.wantUnmap)
+		}
 	}
 }
 
