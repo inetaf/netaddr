@@ -8,6 +8,7 @@
 package netaddr // import "inet.af/netaddr"
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"net"
@@ -34,19 +35,31 @@ type IP struct {
 type ipImpl interface {
 	is4() bool
 	is6() bool
+	as16() [16]byte
 	String() string
 }
 
 type v4Addr [4]byte
 
-func (v4Addr) is4() bool         { return true }
-func (v4Addr) is6() bool         { return false }
+func (v4Addr) is4() bool { return true }
+func (v4Addr) is6() bool { return false }
+func (ip v4Addr) as16() [16]byte {
+	return [16]byte{
+		10: 0xff,
+		11: 0xff,
+		12: ip[0],
+		13: ip[1],
+		14: ip[2],
+		15: ip[3],
+	}
+}
 func (ip v4Addr) String() string { return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]) }
 
 type v6Addr [16]byte
 
-func (v6Addr) is4() bool { return false }
-func (v6Addr) is6() bool { return true }
+func (v6Addr) is4() bool         { return false }
+func (v6Addr) is6() bool         { return true }
+func (ip v6Addr) as16() [16]byte { return ip }
 func (ip v6Addr) String() string {
 	// TODO: better implementation
 	return (&net.IPAddr{IP: net.IP(ip[:])}).String()
@@ -84,6 +97,49 @@ func ParseIP(s string) (IP, error) {
 		return IP{v6AddrZone{v6, ipa.Zone}}, nil
 	}
 	return IP{v6}, nil
+}
+
+// Zone returns ip's IPv6 scoped addressing zone, if any.
+func (ip IP) Zone() string {
+	if v6z, ok := ip.ipImpl.(v6AddrZone); ok {
+		return v6z.zone
+	}
+	return ""
+}
+
+// Less reports whether a sorts before b.
+// IP addresses sort first by length, then their address.
+// IPv6 addresses with zones sort just after the same address without a zone.
+func (a IP) Less(b IP) bool {
+	// Zero value sorts first.
+	if a.ipImpl == nil {
+		return b.ipImpl != nil
+	}
+	if b.ipImpl == nil {
+		return false
+	}
+
+	// At this point, a and b are both either v4 or v6.
+
+	if a4, ok := a.ipImpl.(v4Addr); ok {
+		if b4, ok := b.ipImpl.(v4Addr); ok {
+			return bytes.Compare(a4[:], b4[:]) < 0
+		}
+		// v4 sorts before v6.
+		return true
+	}
+
+	// At this point, a and b are both v6 or v6+zone.
+	a16 := a.ipImpl.as16()
+	b16 := b.ipImpl.as16()
+	switch bytes.Compare(a16[:], b16[:]) {
+	case -1:
+		return true
+	default:
+		return a.Zone() < b.Zone()
+	case 1:
+		return false
+	}
 }
 
 func (ip IP) ipZone() (stdIP net.IP, zone string) {

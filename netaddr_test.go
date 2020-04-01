@@ -5,8 +5,10 @@
 package netaddr
 
 import (
+	"fmt"
 	"net"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -143,6 +145,56 @@ func TestIPProperties(t *testing.T) {
 				t.Errorf("IsMulticast = %v; want %v", multicast, tt.multicast)
 			}
 		})
+	}
+}
+
+func TestLess(t *testing.T) {
+	tests := []struct {
+		a, b IP
+		want bool
+	}{
+		{IP{}, IP{}, false},
+		{IP{}, mustIP("1.2.3.4"), true},
+		{mustIP("1.2.3.4"), IP{}, false},
+
+		{mustIP("1.2.3.4"), mustIP("0102:0304::0"), true},
+		{mustIP("0102:0304::0"), mustIP("1.2.3.4"), false},
+		{mustIP("1.2.3.4"), mustIP("1.2.3.4"), false},
+
+		{mustIP("::1"), mustIP("::2"), true},
+		{mustIP("::1"), mustIP("::1%foo"), true},
+		{mustIP("::1%foo"), mustIP("::2"), true},
+		{mustIP("::2"), mustIP("::3"), true},
+	}
+	for _, tt := range tests {
+		got := tt.a.Less(tt.b)
+		if got != tt.want {
+			t.Errorf("Less(%s, %s) = %v; want %v", tt.a, tt.b, got, tt.want)
+		}
+
+		// Also check inverse.
+		if got == tt.want && got {
+			got2 := tt.b.Less(tt.a)
+			if got2 {
+				t.Errorf("Less(%s, %s) was correctly %v, but so was Less(%s, %s)", tt.a, tt.b, got, tt.b, tt.a)
+			}
+		}
+	}
+
+	// And just sort.
+	values := []IP{
+		mustIP("::1"),
+		mustIP("::2"),
+		IP{},
+		mustIP("1.2.3.4"),
+		mustIP("8.8.8.8"),
+		mustIP("::1%foo"),
+	}
+	sort.Slice(values, func(i, j int) bool { return values[i].Less(values[j]) })
+	got := fmt.Sprintf("%s", values)
+	want := `[invalid IP 1.2.3.4 8.8.8.8 ::1 ::1%foo ::2]`
+	if got != want {
+		t.Errorf("unexpected sort\n got: %s\nwant: %s\n", got, want)
 	}
 }
 
