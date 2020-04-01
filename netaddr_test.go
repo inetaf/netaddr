@@ -5,6 +5,7 @@
 package netaddr
 
 import (
+	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -39,6 +40,48 @@ func TestParseString(t *testing.T) {
 				t.Errorf("String = %q; want %q", back, s)
 			}
 		})
+	}
+}
+
+func TestIPMarshalUnmarshal(t *testing.T) {
+	tests := []string{
+		"",
+		"1.2.3.4",
+		"0.0.0.0",
+		"::",
+		"::1",
+		"fe80::1cc0:3e8c:119f:c2e1%ens18",
+		"::ffff:c000:1234",
+	}
+
+	for _, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			// Ensure that JSON  (and by extension, text) marshaling is
+			// sane by entering quoted input.
+			orig := `"` + s + `"`
+
+			var ip IP
+			if err := json.Unmarshal([]byte(orig), &ip); err != nil {
+				t.Fatalf("failed to unmarshal: %v", err)
+			}
+
+			ipb, err := json.Marshal(ip)
+			if err != nil {
+				t.Fatalf("failed to marshal: %v", err)
+			}
+
+			back := string(ipb)
+			if orig != back {
+				t.Errorf("Marshal = %q; want %q", back, orig)
+			}
+		})
+	}
+}
+
+func TestIPUnmarshalTextNonZero(t *testing.T) {
+	ip := mustIP("::1")
+	if err := ip.UnmarshalText([]byte("xxx")); err == nil {
+		t.Fatal("unmarshaled into non-empty IP")
 	}
 }
 
