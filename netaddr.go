@@ -107,10 +107,11 @@ func (ip IP) Zone() string {
 	return ""
 }
 
-// Less reports whether a sorts before b.
+// Less reports whether ip sorts before ip2.
 // IP addresses sort first by length, then their address.
 // IPv6 addresses with zones sort just after the same address without a zone.
-func (a IP) Less(b IP) bool {
+func (ip IP) Less(ip2 IP) bool {
+	a, b := ip, ip2
 	// Zero value sorts first.
 	if a.ipImpl == nil {
 		return b.ipImpl != nil
