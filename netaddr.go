@@ -86,32 +86,31 @@ func ParseIP(s string) (IP, error) {
 	return IP{v6}, nil
 }
 
+func (ip IP) ipZone() (stdIP net.IP, zone string) {
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return nil, ""
+	case v4Addr:
+		return net.IP{ip[0], ip[1], ip[2], ip[3]}, ""
+	case v6Addr:
+		stdIP = make(net.IP, net.IPv6len)
+		copy(stdIP, ip[:])
+		return stdIP, ""
+	case v6AddrZone:
+		stdIP = make(net.IP, net.IPv6len)
+		copy(stdIP, ip.v6Addr[:])
+		return stdIP, ip.zone
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
 // IPAddr returns the net.IPAddr representation of an IP. The returned value is
 // always non-nil, but the IPAddr.IP will be nil if ip is the zero value.
 // If ip contains a zone identifier, IPAddr.Zone is populated.
 func (ip IP) IPAddr() *net.IPAddr {
-	switch ip := ip.ipImpl.(type) {
-	case nil:
-		// Nothing to do.
-		return &net.IPAddr{}
-	case v4Addr:
-		return &net.IPAddr{IP: net.IP{ip[0], ip[1], ip[2], ip[3]}}
-	case v6Addr:
-		b := make(net.IP, net.IPv6len)
-		copy(b, ip[:])
-
-		return &net.IPAddr{IP: b}
-	case v6AddrZone:
-		b := make(net.IP, net.IPv6len)
-		copy(b, ip.v6Addr[:])
-
-		return &net.IPAddr{
-			IP:   b,
-			Zone: ip.zone,
-		}
-	default:
-		panic("netaddr: unhandled ipImpl representation")
-	}
+	stdIP, zone := ip.ipZone()
+	return &net.IPAddr{IP: stdIP, Zone: zone}
 }
 
 // Is4 reports whether ip is an IPv4 address.
@@ -187,4 +186,36 @@ func (ip *IP) UnmarshalText(text []byte) error {
 	var err error
 	*ip, err = ParseIP(string(text))
 	return err
+}
+
+// IPPort is an IP & port number.
+//
+// It's meant to be used as a value type.
+type IPPort struct {
+	IP   IP
+	Port uint16
+}
+
+// UDPAddr returns a standard library net.UDPAddr from p.
+// The returned value is always non-nil. If p.IP is the zero
+// value, then UDPAddr.IP is nil.
+func (p IPPort) UDPAddr() *net.UDPAddr {
+	ip, zone := p.IP.ipZone()
+	return &net.UDPAddr{
+		IP:   ip,
+		Port: int(p.Port),
+		Zone: zone,
+	}
+}
+
+// TCPAddr returns a standard library net.UDPAddr from p.
+// The returned value is always non-nil. If p.IP is the zero
+// value, then TCPAddr.IP is nil.
+func (p IPPort) TCPAddr() *net.TCPAddr {
+	ip, zone := p.IP.ipZone()
+	return &net.TCPAddr{
+		IP:   ip,
+		Port: int(p.Port),
+		Zone: zone,
+	}
 }
