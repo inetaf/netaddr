@@ -90,6 +90,11 @@ func (ip v6AddrZone) String() string {
 	return (&net.IPAddr{IP: net.IP(ip.v6Addr[:]), Zone: ip.zone}).String()
 }
 
+// IPv4 returns the IP of the IPv4 address a.b.c.d.
+func IPv4(a, b, c, d uint8) IP {
+	return IP{v4Addr{a, b, c, d}}
+}
+
 // ParseIP parses s as an IP address, returning the result. The string
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").

@@ -280,3 +280,56 @@ func mustIP(s string) IP {
 
 	return ip
 }
+
+func BenchmarkStdIPv4(b *testing.B) {
+	b.ReportAllocs()
+	ips := []net.IP{}
+	for i := 0; i < b.N; i++ {
+		ip := net.IPv4(8, 8, 8, 8)
+		ips = ips[:0]
+		for i := 0; i < 100; i++ {
+			ips = append(ips, ip)
+		}
+	}
+}
+
+func BenchmarkIPv4(b *testing.B) {
+	b.ReportAllocs()
+	ips := []IP{}
+	for i := 0; i < b.N; i++ {
+		ip := IPv4(8, 8, 8, 8)
+		ips = ips[:0]
+		for i := 0; i < 100; i++ {
+			ips = append(ips, ip)
+		}
+	}
+}
+
+// ip4i was one of the possible representations of IP that came up in
+// discussions, inlining IPv4 addresses, but having an "overflow"
+// interface for IPv6 or IPv6 + zone. This is here for benchmarking.
+type ip4i struct {
+	ip4    [4]byte
+	flags1 byte
+	flags2 byte
+	flags3 byte
+	flags4 byte
+	ipv6   interface{}
+}
+
+func newip4i_v4(a, b, c, d byte) ip4i {
+	return ip4i{ip4: [4]byte{a, b, c, d}}
+}
+
+// BenchmarkIPv4_inline benchmarks the candidate representation, ip4i.
+func BenchmarkIPv4_inline(b *testing.B) {
+	b.ReportAllocs()
+	ips := []ip4i{}
+	for i := 0; i < b.N; i++ {
+		ip := newip4i_v4(8, 8, 8, 8)
+		ips = ips[:0]
+		for i := 0; i < 100; i++ {
+			ips = append(ips, ip)
+		}
+	}
+}
