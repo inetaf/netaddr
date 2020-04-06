@@ -333,3 +333,27 @@ func BenchmarkIPv4_inline(b *testing.B) {
 		}
 	}
 }
+
+func BenchmarkStdIPv6(b *testing.B) {
+	b.ReportAllocs()
+	ips := []net.IP{}
+	for i := 0; i < b.N; i++ {
+		ip := net.ParseIP("2001:db8::1")
+		ips = ips[:0]
+		for i := 0; i < 100; i++ {
+			ips = append(ips, ip)
+		}
+	}
+}
+
+func BenchmarkIPv6(b *testing.B) {
+	b.ReportAllocs()
+	ips := []IP{}
+	for i := 0; i < b.N; i++ {
+		ip := mustIP("2001:db8::1")
+		ips = ips[:0]
+		for i := 0; i < 100; i++ {
+			ips = append(ips, ip)
+		}
+	}
+}
