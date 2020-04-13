@@ -10,6 +10,7 @@ import (
 	"net"
 	"reflect"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -272,6 +273,144 @@ func TestIs4In6(t *testing.T) {
 	}
 }
 
+func TestIPPrefix(t *testing.T) {
+	tests := []struct {
+		prefix      string
+		ip          IP
+		bits        uint8
+		contains    []IP
+		notContains []IP
+	}{
+		{
+			prefix:      "192.168.0.0/24",
+			ip:          mustIP("192.168.0.0"),
+			bits:        24,
+			contains:    mustIPs("192.168.0.1", "192.168.0.55"),
+			notContains: mustIPs("192.168.1.1", "1.1.1.1"),
+		},
+		{
+			prefix:      "192.168.1.1/32",
+			ip:          mustIP("192.168.1.1"),
+			bits:        32,
+			contains:    mustIPs("192.168.1.1"),
+			notContains: mustIPs("192.168.1.2"),
+		},
+		{
+			prefix:      "2001:db8::/96",
+			ip:          mustIP("2001:db8::"),
+			bits:        96,
+			contains:    mustIPs("2001:db8::aaaa:bbbb", "2001:db8::1"),
+			notContains: mustIPs("2001:db8::1:aaaa:bbbb", "2001:db9::"),
+		},
+		{
+			prefix:   "0.0.0.0/0",
+			ip:       mustIP("0.0.0.0"),
+			bits:     0,
+			contains: mustIPs("192.168.0.1", "1.1.1.1"),
+		},
+		{
+			prefix:   "::/0",
+			ip:       mustIP("::"),
+			bits:     0,
+			contains: mustIPs("::1", "2001:db8::1"),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.prefix, func(t *testing.T) {
+			prefix, err := ParseIPPrefix(test.prefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if prefix.IP != test.ip {
+				t.Errorf("IP=%s, want %s", prefix.IP, test.ip)
+			}
+			if prefix.Bits != test.bits {
+				t.Errorf("bits=%d, want %d", prefix.Bits, test.bits)
+			}
+			for _, ip := range test.contains {
+				if !prefix.Contains(ip) {
+					t.Errorf("does not contain %s", ip)
+				}
+			}
+			for _, ip := range test.notContains {
+				if prefix.Contains(ip) {
+					t.Errorf("contains %s", ip)
+				}
+			}
+			if got := prefix.String(); got != test.prefix {
+				t.Errorf("prefix.String()=%q, want %q", got, test.prefix)
+			}
+		})
+	}
+}
+
+func TestParseIPPrefixAllocs(t *testing.T) {
+	tests := []struct {
+		ip    string
+		slash string
+	}{
+		{"192.168.1.0", "/24"},
+		{"aaaa:bbbb:cccc::", "/24"},
+	}
+	for _, test := range tests {
+		prefix := test.ip + test.slash
+		t.Run(prefix, func(t *testing.T) {
+			ipAllocs := int(testing.AllocsPerRun(5, func() {
+				ParseIP(test.ip)
+			}))
+			prefixAllocs := int(testing.AllocsPerRun(5, func() {
+				ParseIPPrefix(prefix)
+			}))
+			if got := prefixAllocs - ipAllocs; got != 0 {
+				t.Errorf("allocs=%d, want 0", got)
+			}
+		})
+	}
+}
+
+func TestParseIPPrefixError(t *testing.T) {
+	tests := []struct {
+		prefix string
+		errstr string
+	}{
+		{
+			prefix: "192.168.0.0",
+			errstr: "no '/'",
+		},
+		{
+			prefix: "1.257.1.1/24",
+			errstr: "lookup 1.257.1.1: no such host", // TODO: improve ParseIP error
+		},
+		{
+			prefix: "1.1.1.0/q",
+			errstr: "bad prefix",
+		},
+		{
+			prefix: "1.1.1.0/-1",
+			errstr: "out of range",
+		},
+		{
+			prefix: "1.1.1.0/33",
+			errstr: "out of range",
+		},
+		{
+			prefix: "2001::/129",
+			errstr: "out of range",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.prefix, func(t *testing.T) {
+			_, err := ParseIPPrefix(test.prefix)
+			if err == nil {
+				t.Fatal("no error")
+			}
+			if got := err.Error(); !strings.Contains(got, test.errstr) {
+				t.Errorf("error is missing substring %q: %s", test.errstr, got)
+			}
+		})
+	}
+}
+
 func mustIP(s string) IP {
 	ip, err := ParseIP(s)
 	if err != nil {
@@ -279,6 +418,14 @@ func mustIP(s string) IP {
 	}
 
 	return ip
+}
+
+func mustIPs(strs ...string) []IP {
+	var res []IP
+	for _, s := range strs {
+		res = append(res, mustIP(s))
+	}
+	return res
 }
 
 func BenchmarkStdIPv4(b *testing.B) {
@@ -355,5 +502,17 @@ func BenchmarkIPv6(b *testing.B) {
 		for i := 0; i < 100; i++ {
 			ips = append(ips, ip)
 		}
+	}
+}
+
+func BenchmarkIPv4Contains(b *testing.B) {
+	b.ReportAllocs()
+	prefix := IPPrefix{
+		IP:   IPv4(192, 168, 1, 0),
+		Bits: 24,
+	}
+	ip := IPv4(192, 168, 1, 1)
+	for i := 0; i < b.N; i++ {
+		prefix.Contains(ip)
 	}
 }
