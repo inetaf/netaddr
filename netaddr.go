@@ -11,7 +11,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"math"
 	"net"
+	"strconv"
 	"strings"
 )
 
@@ -322,4 +324,99 @@ func (p IPPort) TCPAddr() *net.TCPAddr {
 		Port: int(p.Port),
 		Zone: zone,
 	}
+}
+
+// IPPrefix is an IP address prefix representing an IP network.
+//
+// The first Bits of IP are specified, the remaining bits match any address.
+// The range of Bits is [0,32] for IPv4 or [0,128] for IPv6.
+type IPPrefix struct {
+	IP   IP
+	Bits uint8
+}
+
+// ParseIPPrefix parses s as an IP address prefix.
+// The string can be in the form "192.168.1.0/24" or "2001::db8::/32",
+// the CIDR notation defined in RFC 4632 and RFC 4291.
+func ParseIPPrefix(s string) (IPPrefix, error) {
+	i := strings.IndexByte(s, '/')
+	if i < 0 {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): no '/'", s)
+	}
+	ip, err := ParseIP(s[:i])
+	if err != nil {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): %w", s, err)
+	}
+	s = s[i+1:]
+	bits, err := strconv.Atoi(s)
+	if err != nil {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): bad prefix: %w", s, err)
+	}
+	maxBits := 32
+	if ip.Is6() {
+		maxBits = 128
+	}
+	if bits < 0 || bits > maxBits {
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): prefix length out of range", s)
+	}
+	return IPPrefix{
+		IP:   ip,
+		Bits: uint8(bits),
+	}, nil
+}
+
+// IPNet returns the net.IPNet representation of an IPPrefix.
+// The returned value is always non-nil.
+// Any zone identifier is dropped in the conversion.
+func (p IPPrefix) IPNet() *net.IPNet {
+	bits := 128
+	if p.IP.Is4() {
+		bits = 32
+	}
+	stdIP, _ := p.IP.ipZone()
+	return &net.IPNet{
+		IP:   stdIP,
+		Mask: net.CIDRMask(int(p.Bits), bits),
+	}
+}
+
+// Contains reports whether the network p includes addr.
+//
+// An IPv4 address will not match an IPv6 prefix.
+// A 4-in-6 IP will not match an IPv4 prefix.
+func (p IPPrefix) Contains(addr IP) bool {
+	var nn, ip []byte // these do not escape and so do not allocate
+	if p.IP.is4() {
+		if !addr.is4() {
+			return false
+		}
+		a1 := p.IP.ipImpl.(v4Addr)
+		a2 := addr.ipImpl.(v4Addr)
+		nn, ip = a1[:], a2[:]
+	} else {
+		if addr.is4() {
+			return false
+		}
+		a1 := p.IP.ipImpl.(v6Addr)
+		a2 := addr.ipImpl.(v6Addr)
+		nn, ip = a1[:], a2[:]
+	}
+	bits := p.Bits
+	for i := 0; bits > 0 && i < len(nn); i++ {
+		m := uint8(math.MaxUint8)
+		if bits < 8 {
+			zeros := 8 - bits
+			m = m >> zeros << zeros
+		}
+		if nn[i]&m != ip[i]&m {
+			return false
+		}
+		bits -= 8
+	}
+	return true
+}
+
+// Strings returns the CIDR notation of p: "<ip>/<bits>".
+func (p IPPrefix) String() string {
+	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
 }
