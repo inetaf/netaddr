@@ -158,10 +158,10 @@ func (ip IP) Less(ip2 IP) bool {
 	switch bytes.Compare(a16[:], b16[:]) {
 	case -1:
 		return true
-	default:
-		return a.Zone() < b.Zone()
 	case 1:
 		return false
+	default: // case 0 (bytes.Compare only returns -1, 1, 0)
+		return a.Zone() < b.Zone()
 	}
 }
 
