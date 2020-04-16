@@ -327,6 +327,73 @@ func (ip IP) IsMulticast() bool {
 	}
 }
 
+// Prefix applies a CIDR mask of leading bits to IP, producing an IPPrefix
+// of the specified length. If IP is the zero value, a zero-value IPPrefix and
+// a nil error are returned. If bits is larger than 32 for an IPv4 address or
+// 128 for an IPv6 address, an error is returned.
+func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
+	maxBits := uint8(32)
+	if ip.Is6() {
+		maxBits = 128
+	}
+
+	if bits > maxBits {
+		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
+	}
+
+	var b []byte
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		// Zero-value input produces zero-value output.
+		return IPPrefix{}, nil
+	case v4Addr:
+		b = ip[:]
+	case v6Addr:
+		b = ip[:]
+	case v6AddrZone:
+		b = ip.v6Addr[:]
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+
+	// Apply the mask specified by bits.
+	n := bits
+	for i := 0; i < len(b); i++ {
+		if n >= 8 {
+			b[i] &= 0xff
+			n -= 8
+			continue
+		}
+
+		b[i] = ^byte(0xff >> n)
+		n = 0
+	}
+
+	var out IP
+	switch ip.ipImpl.(type) {
+	case v4Addr:
+		var v4 v4Addr
+		copy(v4[:], b)
+		out = IP{ipImpl: v4}
+	case v6Addr:
+		var v6 v6Addr
+		copy(v6[:], b)
+		out = IP{ipImpl: v6}
+	case v6AddrZone:
+		var v6 v6AddrZone
+		copy(v6.v6Addr[:], b)
+		v6.zone = ip.Zone()
+		out = IP{ipImpl: v6}
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+
+	return IPPrefix{
+		IP:   out,
+		Bits: bits,
+	}, nil
+}
+
 // String returns the string form of the IP address ip.
 // It returns one of 4 forms:
 //

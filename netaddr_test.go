@@ -352,6 +352,119 @@ func TestLess(t *testing.T) {
 	}
 }
 
+func TestIPPrefixMasking(t *testing.T) {
+	type subtest struct {
+		ip   IP
+		bits uint8
+		p    IPPrefix
+		ok   bool
+	}
+
+	// makeIPv6 produces a set of IPv6 subtests with an optional zone identifier.
+	makeIPv6 := func(zone string) []subtest {
+		if zone != "" {
+			zone = "%" + zone
+		}
+
+		return []subtest{
+			{
+				ip:   mustIP(fmt.Sprintf("2001:db8::1%s", zone)),
+				bits: 255,
+			},
+			{
+				ip:   mustIP(fmt.Sprintf("2001:db8::1%s", zone)),
+				bits: 32,
+				p:    mustIPPrefix(fmt.Sprintf("2001:db8::%s/32", zone)),
+				ok:   true,
+			},
+			{
+				ip:   mustIP(fmt.Sprintf("fe80::dead:beef:dead:beef%s", zone)),
+				bits: 96,
+				p:    mustIPPrefix(fmt.Sprintf("fe80::dead:beef:0:0%s/96", zone)),
+				ok:   true,
+			},
+		}
+	}
+
+	tests := []struct {
+		family   string
+		subtests []subtest
+	}{
+		{
+			family: "nil",
+			subtests: []subtest{
+				{
+					bits: 255,
+				},
+				{
+					bits: 16,
+					ok:   true,
+				},
+			},
+		},
+		{
+			family: "IPv4",
+			subtests: []subtest{
+				{
+					ip:   mustIP("192.0.2.0"),
+					bits: 255,
+				},
+				{
+					ip:   mustIP("192.0.2.0"),
+					bits: 16,
+					p:    mustIPPrefix("192.0.0.0/16"),
+					ok:   true,
+				},
+				{
+					ip:   mustIP("255.255.255.255"),
+					bits: 20,
+					p:    mustIPPrefix("255.255.240.0/20"),
+					ok:   true,
+				},
+			},
+		},
+		{
+			family:   "IPv6",
+			subtests: makeIPv6(""),
+		},
+		{
+			family:   "IPv6 zone",
+			subtests: makeIPv6("eth0"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.family, func(t *testing.T) {
+			for _, st := range tt.subtests {
+				t.Run(st.p.String(), func(t *testing.T) {
+					// Ensure st.ip is not mutated.
+					orig := st.ip.String()
+
+					p, err := st.ip.Prefix(st.bits)
+					if st.ok && err != nil {
+						t.Fatalf("failed to produce prefix: %v", err)
+					}
+					if !st.ok && err == nil {
+						t.Fatal("expected an error, but none occurred")
+					}
+					if err != nil {
+						t.Logf("err: %v", err)
+						return
+					}
+
+					if !reflect.DeepEqual(p, st.p) {
+						t.Errorf("prefix = %q, want %q", p, st.p)
+					}
+
+					if got := st.ip.String(); got != orig {
+						t.Errorf("IP was mutated: %q, want %q", got, orig)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestIs4In6(t *testing.T) {
 	tests := []struct {
 		ip        IP
@@ -535,6 +648,15 @@ func mustIPs(strs ...string) []IP {
 		res = append(res, mustIP(s))
 	}
 	return res
+}
+
+func mustIPPrefix(s string) IPPrefix {
+	p, err := ParseIPPrefix(s)
+	if err != nil {
+		panic(err)
+	}
+
+	return p
 }
 
 func BenchmarkStdIPv4(b *testing.B) {
