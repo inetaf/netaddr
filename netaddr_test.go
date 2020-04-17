@@ -142,24 +142,27 @@ func TestIPIPAddr(t *testing.T) {
 }
 
 func TestIPProperties(t *testing.T) {
-	// TODO: expand test with more Is* property checks.
-
 	var (
 		nilIP IP
 
 		unicast4     = mustIP("192.0.2.1")
-		unicast6     = mustIP("2001:db::1")
-		unicastZone6 = mustIP("fe80::1%eth0")
+		unicast6     = mustIP("2001:db8::1")
+		unicastZone6 = mustIP("2001:db8::1%eth0")
 
 		multicast4     = mustIP("224.0.0.1")
 		multicast6     = mustIP("ff02::1")
 		multicastZone6 = mustIP("ff02::1%eth0")
+
+		llu4     = mustIP("169.254.0.1")
+		llu6     = mustIP("fe80::1")
+		lluZone6 = mustIP("fe80::1%eth0")
 	)
 
 	tests := []struct {
-		name      string
-		ip        IP
-		multicast bool
+		name             string
+		ip               IP
+		multicast        bool
+		linkLocalUnicast bool
 	}{
 		{
 			name: "nil",
@@ -192,6 +195,21 @@ func TestIPProperties(t *testing.T) {
 			ip:        multicastZone6,
 			multicast: true,
 		},
+		{
+			name:             "link-local unicast v4Addr",
+			ip:               llu4,
+			linkLocalUnicast: true,
+		},
+		{
+			name:             "link-local unicast v6Addr",
+			ip:               llu6,
+			linkLocalUnicast: true,
+		},
+		{
+			name:             "link-local unicast v6AddrZone",
+			ip:               lluZone6,
+			linkLocalUnicast: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -199,6 +217,11 @@ func TestIPProperties(t *testing.T) {
 			multicast := tt.ip.IsMulticast()
 			if multicast != tt.multicast {
 				t.Errorf("IsMulticast = %v; want %v", multicast, tt.multicast)
+			}
+
+			llu := tt.ip.IsLinkLocalUnicast()
+			if llu != tt.linkLocalUnicast {
+				t.Errorf("IsLinkLocalUnicast = %v; want %v", llu, tt.linkLocalUnicast)
 			}
 		})
 	}

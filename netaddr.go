@@ -250,6 +250,24 @@ func (ip IP) Unmap() IP {
 	return IP{v4Addr{a[12], a[13], a[14], a[15]}}
 }
 
+// IsLinkLocalUnicast reports whether ip is a link-local unicast address.
+// If ip is the zero value, it will return false.
+func (ip IP) IsLinkLocalUnicast() bool {
+	// See: https://en.wikipedia.org/wiki/Link-local_address.
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return false
+	case v4Addr:
+		return ip[0] == 169 && ip[1] == 254
+	case v6Addr:
+		return ip[0] == 0xfe && ip[1] == 0x80
+	case v6AddrZone:
+		return ip.v6Addr[0] == 0xfe && ip.v6Addr[1] == 0x80
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
 // IsMulticast reports whether ip is a multicast address. If ip is the zero
 // value, it will return false.
 func (ip IP) IsMulticast() bool {
