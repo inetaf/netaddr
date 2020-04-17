@@ -128,6 +128,15 @@ func TestIPIPAddr(t *testing.T) {
 			if !reflect.DeepEqual(tt.ipa, got) {
 				t.Errorf("IPAddr = %+v; want %+v", got, tt.ipa)
 			}
+
+			if got.Zone == "" && tt.ip != (IP{}) {
+				back, ok := FromStdIP(got.IP)
+				if !ok {
+					t.Errorf("FromStdIP failed")
+				} else if back != tt.ip {
+					t.Errorf("FromStdIP = %v; want %v", back, tt.ip)
+				}
+			}
 		})
 	}
 }

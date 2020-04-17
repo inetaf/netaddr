@@ -123,6 +123,22 @@ func ParseIP(s string) (IP, error) {
 	return IP{v6}, nil
 }
 
+// FromStdIP returns an IP from the standard library's IP type.
+// If std is invalid, ok is false.
+func FromStdIP(std net.IP) (ip IP, ok bool) {
+	switch len(std) {
+	case 4:
+		var a v4Addr
+		copy(a[:], std)
+		return IP{a}, true
+	case 16:
+		var a v6Addr
+		copy(a[:], std)
+		return IP{a}, true
+	}
+	return IP{}, false
+}
+
 // Zone returns ip's IPv6 scoped addressing zone, if any.
 func (ip IP) Zone() string {
 	if v6z, ok := ip.ipImpl.(v6AddrZone); ok {
