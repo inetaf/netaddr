@@ -250,6 +250,25 @@ func (ip IP) Unmap() IP {
 	return IP{v4Addr{a[12], a[13], a[14], a[15]}}
 }
 
+// WithZone returns an IP that's the same as ip but with the provided
+// zone. If zone is empty, the zone is removed. If ip is an IPv4
+// address it's returned unchanged.
+func (ip IP) WithZone(zone string) IP {
+	if zone == "" {
+		if z, ok := ip.ipImpl.(v6AddrZone); ok {
+			return IP{z.v6Addr}
+		}
+		return ip
+	}
+	switch ip := ip.ipImpl.(type) {
+	case v6Addr:
+		return IP{v6AddrZone{ip, zone}}
+	case v6AddrZone:
+		return IP{v6AddrZone{ip.v6Addr, zone}}
+	}
+	return ip
+}
+
 // IsLinkLocalUnicast reports whether ip is a link-local unicast address.
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalUnicast() bool {
@@ -334,6 +353,28 @@ func (ip *IP) UnmarshalText(text []byte) error {
 type IPPort struct {
 	IP   IP
 	Port uint16
+}
+
+const maxUint16 = 1<<16 - 1
+
+// FromStdAddr maps the components of a standard library TCPAddr or
+// UDPAddr into an IPPort.
+func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
+	ip, ok := FromStdIP(stdIP)
+	if !ok || port < 0 || port > maxUint16 {
+		return
+	}
+	ip = ip.Unmap()
+	ipp := IPPort{IP: ip, Port: uint16(port)}
+	if zone != "" {
+		v6a, is6 := ip.ipImpl.(v6Addr)
+		if !is6 {
+			return
+		}
+		ipp.IP = IP{v6AddrZone{v6a, zone}}
+		return ipp, true
+	}
+	return ipp, true
 }
 
 // UDPAddr returns a standard library net.UDPAddr from p.

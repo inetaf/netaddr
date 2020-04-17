@@ -141,6 +141,62 @@ func TestIPIPAddr(t *testing.T) {
 	}
 }
 
+func TestFromStdAddr(t *testing.T) {
+	tests := []struct {
+		name string
+		ua   *net.UDPAddr
+		want IPPort
+	}{
+		{
+			name: "v4",
+			ua: &net.UDPAddr{
+				IP:   net.ParseIP("1.2.3.4"),
+				Port: 567,
+			},
+			want: IPPort{mustIP("1.2.3.4").Unmap(), 567},
+		},
+		{
+			name: "v6",
+			ua: &net.UDPAddr{
+				IP:   net.ParseIP("::1"),
+				Port: 567,
+			},
+			want: IPPort{mustIP("::1").Unmap(), 567},
+		},
+		{
+			name: "v6zone",
+			ua: &net.UDPAddr{
+				IP:   net.ParseIP("::1"),
+				Port: 567,
+				Zone: "foo",
+			},
+			want: IPPort{mustIP("::1").Unmap().WithZone("foo"), 567},
+		},
+		{
+			name: "v4zone_bad",
+			ua: &net.UDPAddr{
+				IP:   net.ParseIP("1.2.3.4"),
+				Port: 567,
+				Zone: "foo",
+			},
+			want: IPPort{},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := FromStdAddr(tt.ua.IP, tt.ua.Port, tt.ua.Zone)
+			if !ok {
+				if got != (IPPort{}) {
+					t.Fatalf("!ok but non-zero result")
+				}
+			}
+			if got != tt.want {
+				t.Errorf("got %+v; want %+v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestIPProperties(t *testing.T) {
 	var (
 		nilIP IP
