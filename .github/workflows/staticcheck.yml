@@ -1,0 +1,28 @@
+name: staticcheck
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - '*'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Set up Go
+      uses: actions/setup-go@v1
+      with:
+        go-version: 1.14
+
+    - name: Check out code
+      uses: actions/checkout@v1
+
+    - name: Print staticcheck version
+      run: go run honnef.co/go/tools/cmd/staticcheck -version
+
+    - name: Run staticcheck
+      run: go run honnef.co/go/tools/cmd/staticcheck -- ./...
