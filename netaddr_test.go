@@ -272,12 +272,12 @@ func TestIPProperties(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			multicast := tt.ip.IsMulticast()
 			if multicast != tt.multicast {
-				t.Errorf("IsMulticast = %v; want %v", multicast, tt.multicast)
+				t.Errorf("IsMulticast(%v) = %v; want %v", tt.ip, multicast, tt.multicast)
 			}
 
 			llu := tt.ip.IsLinkLocalUnicast()
 			if llu != tt.linkLocalUnicast {
-				t.Errorf("IsLinkLocalUnicast = %v; want %v", llu, tt.linkLocalUnicast)
+				t.Errorf("IsLinkLocalUnicast(%v) = %v; want %v", tt.ip, llu, tt.linkLocalUnicast)
 			}
 		})
 	}
