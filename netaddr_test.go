@@ -212,6 +212,9 @@ func TestIPProperties(t *testing.T) {
 		llu4     = mustIP("169.254.0.1")
 		llu6     = mustIP("fe80::1")
 		lluZone6 = mustIP("fe80::1%eth0")
+
+		loopback4 = mustIP("127.0.0.1")
+		loopback6 = mustIP("::1")
 	)
 
 	tests := []struct {
@@ -219,6 +222,7 @@ func TestIPProperties(t *testing.T) {
 		ip               IP
 		multicast        bool
 		linkLocalUnicast bool
+		loopback         bool
 	}{
 		{
 			name: "nil",
@@ -266,6 +270,16 @@ func TestIPProperties(t *testing.T) {
 			ip:               lluZone6,
 			linkLocalUnicast: true,
 		},
+		{
+			name:     "loopback v4Addr",
+			ip:       loopback4,
+			loopback: true,
+		},
+		{
+			name:     "loopback v6Addr",
+			ip:       loopback6,
+			loopback: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -278,6 +292,11 @@ func TestIPProperties(t *testing.T) {
 			llu := tt.ip.IsLinkLocalUnicast()
 			if llu != tt.linkLocalUnicast {
 				t.Errorf("IsLinkLocalUnicast(%v) = %v; want %v", tt.ip, llu, tt.linkLocalUnicast)
+			}
+
+			lo := tt.ip.IsLoopback()
+			if lo != tt.loopback {
+				t.Errorf("IsLoopback(%v) = %v; want %v", tt.ip, lo, tt.loopback)
 			}
 		})
 	}

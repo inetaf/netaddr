@@ -60,8 +60,13 @@ func (ip v4Addr) as16() [16]byte {
 }
 func (ip v4Addr) String() string { return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]) }
 
-// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
-const mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
+const (
+	// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
+	mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
+
+	// v6Loopback is the IPv6 loopback address.
+	v6Loopback = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x01"
+)
 
 type v6Addr [16]byte
 
@@ -282,6 +287,23 @@ func (ip IP) IsLinkLocalUnicast() bool {
 		return ip[0] == 0xfe && ip[1] == 0x80
 	case v6AddrZone:
 		return ip.v6Addr[0] == 0xfe && ip.v6Addr[1] == 0x80
+	default:
+		panic("netaddr: unhandled ipImpl representation")
+	}
+}
+
+// IsLoopback reports whether ip is a loopback address. If ip is the zero value,
+// it will return false.
+func (ip IP) IsLoopback() bool {
+	switch ip := ip.ipImpl.(type) {
+	case nil:
+		return false
+	case v4Addr:
+		return ip[0] == 127
+	case v6Addr:
+		return string(ip[:len(v6Loopback)]) == v6Loopback
+	case v6AddrZone:
+		return string(ip.v6Addr[:len(v6Loopback)]) == v6Loopback
 	default:
 		panic("netaddr: unhandled ipImpl representation")
 	}
