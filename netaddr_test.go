@@ -465,6 +465,33 @@ func TestIPPrefixMasking(t *testing.T) {
 	}
 }
 
+func TestIs4AndIs6(t *testing.T) {
+	tests := []struct {
+		ip  IP
+		is4 bool
+		is6 bool
+	}{
+		{IP{}, false, false},
+		{mustIP("1.2.3.4"), true, false},
+		{mustIP("127.0.0.2"), true, false},
+		{mustIP("::1"), false, true},
+		{mustIP("::ffff:192.0.2.128"), false, true},
+		{mustIP("::fffe:c000:0280"), false, true},
+		{mustIP("::1%eth0"), false, true},
+	}
+	for _, tt := range tests {
+		got4 := tt.ip.Is4()
+		if got4 != tt.is4 {
+			t.Errorf("Is4(%q) = %v; want %v", tt.ip, got4, tt.is4)
+		}
+
+		got6 := tt.ip.Is6()
+		if got6 != tt.is6 {
+			t.Errorf("Is6(%q) = %v; want %v", tt.ip, got6, tt.is6)
+		}
+	}
+}
+
 func TestIs4In6(t *testing.T) {
 	tests := []struct {
 		ip        IP
