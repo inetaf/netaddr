@@ -323,14 +323,14 @@ func TestLess(t *testing.T) {
 	for _, tt := range tests {
 		got := tt.a.Less(tt.b)
 		if got != tt.want {
-			t.Errorf("Less(%s, %s) = %v; want %v", tt.a, tt.b, got, tt.want)
+			t.Errorf("Less(%q, %q) = %v; want %v", tt.a, tt.b, got, tt.want)
 		}
 
 		// Also check inverse.
 		if got == tt.want && got {
 			got2 := tt.b.Less(tt.a)
 			if got2 {
-				t.Errorf("Less(%s, %s) was correctly %v, but so was Less(%s, %s)", tt.a, tt.b, got, tt.b, tt.a)
+				t.Errorf("Less(%q, %q) was correctly %v, but so was Less(%q, %q)", tt.a, tt.b, got, tt.b, tt.a)
 			}
 		}
 	}
@@ -486,11 +486,11 @@ func TestIs4In6(t *testing.T) {
 	for _, tt := range tests {
 		got := tt.ip.Is4in6()
 		if got != tt.want {
-			t.Errorf("is4in6(%q) = %v; want %v", tt.ip, got, tt.want)
+			t.Errorf("Is4in6(%q) = %v; want %v", tt.ip, got, tt.want)
 		}
 		u := tt.ip.Unmap()
 		if u != tt.wantUnmap {
-			t.Errorf("Unmap(%v) = %v; want %v", tt.ip, u, tt.wantUnmap)
+			t.Errorf("Unmap(%q) = %v; want %v", tt.ip, u, tt.wantUnmap)
 		}
 	}
 }
