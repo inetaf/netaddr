@@ -527,40 +527,61 @@ func TestIPPrefix(t *testing.T) {
 		prefix      string
 		ip          IP
 		bits        uint8
+		ipNet       *net.IPNet
 		contains    []IP
 		notContains []IP
 	}{
 		{
-			prefix:      "192.168.0.0/24",
-			ip:          mustIP("192.168.0.0"),
-			bits:        24,
+			prefix: "192.168.0.0/24",
+			ip:     mustIP("192.168.0.0"),
+			bits:   24,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("192.168.0.0"),
+				Mask: net.CIDRMask(24, 32),
+			},
 			contains:    mustIPs("192.168.0.1", "192.168.0.55"),
 			notContains: mustIPs("192.168.1.1", "1.1.1.1"),
 		},
 		{
-			prefix:      "192.168.1.1/32",
-			ip:          mustIP("192.168.1.1"),
-			bits:        32,
+			prefix: "192.168.1.1/32",
+			ip:     mustIP("192.168.1.1"),
+			bits:   32,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("192.168.1.1"),
+				Mask: net.CIDRMask(32, 32),
+			},
 			contains:    mustIPs("192.168.1.1"),
 			notContains: mustIPs("192.168.1.2"),
 		},
 		{
-			prefix:      "2001:db8::/96",
-			ip:          mustIP("2001:db8::"),
-			bits:        96,
+			prefix: "2001:db8::/96",
+			ip:     mustIP("2001:db8::"),
+			bits:   96,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("2001:db8::"),
+				Mask: net.CIDRMask(96, 128),
+			},
 			contains:    mustIPs("2001:db8::aaaa:bbbb", "2001:db8::1"),
 			notContains: mustIPs("2001:db8::1:aaaa:bbbb", "2001:db9::"),
 		},
 		{
-			prefix:   "0.0.0.0/0",
-			ip:       mustIP("0.0.0.0"),
-			bits:     0,
+			prefix: "0.0.0.0/0",
+			ip:     mustIP("0.0.0.0"),
+			bits:   0,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("0.0.0.0"),
+				Mask: net.CIDRMask(0, 32),
+			},
 			contains: mustIPs("192.168.0.1", "1.1.1.1"),
 		},
 		{
-			prefix:   "::/0",
-			ip:       mustIP("::"),
-			bits:     0,
+			prefix: "::/0",
+			ip:     mustIP("::"),
+			bits:   0,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("::"),
+				Mask: net.CIDRMask(0, 128),
+			},
 			contains: mustIPs("::1", "2001:db8::1"),
 		},
 	}
@@ -575,6 +596,10 @@ func TestIPPrefix(t *testing.T) {
 			}
 			if prefix.Bits != test.bits {
 				t.Errorf("bits=%d, want %d", prefix.Bits, test.bits)
+			}
+			stdIPNet := prefix.IPNet()
+			if !test.ipNet.IP.Equal(stdIPNet.IP) || !reflect.DeepEqual(stdIPNet.Mask, test.ipNet.Mask) {
+				t.Errorf("IPNet=%v, want %v", stdIPNet, test.ipNet)
 			}
 			for _, ip := range test.contains {
 				if !prefix.Contains(ip) {
