@@ -442,12 +442,12 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 	}
 	ip, err := ParseIP(s[:i])
 	if err != nil {
-		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): %w", s, err)
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): %v", s, err)
 	}
 	s = s[i+1:]
 	bits, err := strconv.Atoi(s)
 	if err != nil {
-		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): bad prefix: %w", s, err)
+		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): bad prefix: %v", s, err)
 	}
 	maxBits := 32
 	if ip.Is6() {
