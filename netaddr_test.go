@@ -618,6 +618,63 @@ func TestIPPrefix(t *testing.T) {
 	}
 }
 
+func TestFromStdIPNet(t *testing.T) {
+	tests := []struct {
+		name string
+		std  *net.IPNet
+		want IPPrefix
+	}{
+		{
+			name: "invalid IP",
+			std: &net.IPNet{
+				IP: net.IP{0xff},
+			},
+		},
+		{
+			name: "invalid mask",
+			std: &net.IPNet{
+				IP:   net.IPv6loopback,
+				Mask: nil,
+			},
+		},
+		{
+			name: "non-contiguous mask",
+			std: &net.IPNet{
+				IP:   net.IPv4(192, 0, 2, 0).To4(),
+				Mask: net.IPv4Mask(255, 0, 255, 0),
+			},
+		},
+		{
+			name: "IPv4",
+			std: &net.IPNet{
+				IP:   net.IPv4(192, 0, 2, 0).To4(),
+				Mask: net.CIDRMask(24, 32),
+			},
+			want: mustIPPrefix("192.0.2.0/24"),
+		},
+		{
+			name: "IPv6",
+			std: &net.IPNet{
+				IP:   net.ParseIP("2001:db8::"),
+				Mask: net.CIDRMask(64, 128),
+			},
+			want: mustIPPrefix("2001:db8::/64"),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := FromStdIPNet(tt.std)
+			if !ok && got != (IPPrefix{}) {
+				t.Fatalf("!ok but non-zero result")
+			}
+
+			if got != tt.want {
+				t.Errorf("FromStdIPNet(%q) = %+v; want %+v", tt.std, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestParseIPPrefixAllocs(t *testing.T) {
 	tests := []struct {
 		ip    string

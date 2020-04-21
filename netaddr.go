@@ -499,6 +499,31 @@ type IPPrefix struct {
 	Bits uint8
 }
 
+// FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
+// If std is invalid, ok is false.
+func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
+	ip, ok := FromStdIP(std.IP)
+	if !ok {
+		return IPPrefix{}, false
+	}
+
+	if l := len(std.Mask); l != net.IPv4len && l != net.IPv6len {
+		// Invalid mask.
+		return IPPrefix{}, false
+	}
+
+	ones, bits := std.Mask.Size()
+	if ones == 0 && bits == 0 {
+		// IPPrefix does not support non-contiguous masks.
+		return IPPrefix{}, false
+	}
+
+	return IPPrefix{
+		IP:   ip,
+		Bits: uint8(ones),
+	}, true
+}
+
 // ParseIPPrefix parses s as an IP address prefix.
 // The string can be in the form "192.168.1.0/24" or "2001::db8::/32",
 // the CIDR notation defined in RFC 4632 and RFC 4291.
