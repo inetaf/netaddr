@@ -97,6 +97,22 @@ func (ip v6AddrZone) String() string {
 	return (&net.IPAddr{IP: net.IP(ip.v6Addr[:]), Zone: ip.zone}).String()
 }
 
+// Well known IP addresses which are accessed only through exported functions,
+// so the linker can eliminate them if they are unused.
+var (
+	// ff02::1
+	ipv6LinkLocalAllNodes = IP{v6Addr{0: 0xff, 1: 0x02, 15: 0x01}}
+	// ::
+	ipv6Unspecified = IP{v6Addr{}}
+)
+
+// IPv6LinkLocalAllNodes returns the IPv6 link-local all nodes multicast
+// address ff02::1.
+func IPv6LinkLocalAllNodes() IP { return ipv6LinkLocalAllNodes }
+
+// IPv6Unspecified returns the IPv6 unspecified address ::.
+func IPv6Unspecified() IP { return ipv6Unspecified }
+
 // IPv4 returns the IP of the IPv4 address a.b.c.d.
 func IPv4(a, b, c, d uint8) IP {
 	return IP{v4Addr{a, b, c, d}}

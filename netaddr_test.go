@@ -302,6 +302,36 @@ func TestIPProperties(t *testing.T) {
 	}
 }
 
+func TestIPWellKnown(t *testing.T) {
+	tests := []struct {
+		name string
+		ip   IP
+		std  net.IP
+	}{
+		{
+			name: "IPv6 link-local all nodes",
+			ip:   IPv6LinkLocalAllNodes(),
+			std:  net.IPv6linklocalallnodes,
+		},
+		{
+			name: "IPv6 unspecified",
+			ip:   IPv6Unspecified(),
+			std:  net.IPv6unspecified,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := tt.std.String()
+			got := tt.ip.String()
+
+			if got != want {
+				t.Fatalf("got %s, want %s", got, want)
+			}
+		})
+	}
+}
+
 func TestLess(t *testing.T) {
 	tests := []struct {
 		a, b IP
