@@ -495,6 +495,49 @@ func TestIPPrefixMasking(t *testing.T) {
 	}
 }
 
+func TestIPPrefixMarshalUnmarshal(t *testing.T) {
+	tests := []string{
+		"",
+		"1.2.3.4/32",
+		"0.0.0.0/0",
+		"::/0",
+		"::1/128",
+		"fe80::1cc0:3e8c:119f:c2e1%ens18/128",
+		"::ffff:c000:1234/128",
+		"2001:db8::/32",
+	}
+
+	for _, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			// Ensure that JSON  (and by extension, text) marshaling is
+			// sane by entering quoted input.
+			orig := `"` + s + `"`
+
+			var p IPPrefix
+			if err := json.Unmarshal([]byte(orig), &p); err != nil {
+				t.Fatalf("failed to unmarshal: %v", err)
+			}
+
+			pb, err := json.Marshal(p)
+			if err != nil {
+				t.Fatalf("failed to marshal: %v", err)
+			}
+
+			back := string(pb)
+			if orig != back {
+				t.Errorf("Marshal = %q; want %q", back, orig)
+			}
+		})
+	}
+}
+
+func TestIPPrefixUnmarshalTextNonZero(t *testing.T) {
+	ip := mustIPPrefix("fe80::/64")
+	if err := ip.UnmarshalText([]byte("xxx")); err == nil {
+		t.Fatal("unmarshaled into non-empty IPPrefix")
+	}
+}
+
 func TestIs4AndIs6(t *testing.T) {
 	tests := []struct {
 		ip  IP

@@ -625,6 +625,34 @@ func (p IPPrefix) Contains(addr IP) bool {
 	return true
 }
 
+// MarshalText implements the encoding.TextMarshaler interface,
+// The encoding is the same as returned by String, with one exception:
+// If p is the zero value, the encoding is the empty string.
+func (p IPPrefix) MarshalText() ([]byte, error) {
+	if p == (IPPrefix{}) {
+		return []byte(""), nil
+	}
+
+	return []byte(p.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The IP address is expected in a form accepted by ParseIPPrefix.
+// It returns an error if *p is not the IPPrefix zero value.
+func (p *IPPrefix) UnmarshalText(text []byte) error {
+	if *p != (IPPrefix{}) {
+		return errors.New("netaddr: refusing to Unmarshal into non-zero IPPrefix")
+	}
+
+	if len(text) == 0 {
+		return nil
+	}
+
+	var err error
+	*p, err = ParseIPPrefix(string(text))
+	return err
+}
+
 // Strings returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
 	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
