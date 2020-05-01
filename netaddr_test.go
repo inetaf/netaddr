@@ -602,7 +602,8 @@ func TestIPPrefix(t *testing.T) {
 				IP:   net.ParseIP("0.0.0.0"),
 				Mask: net.CIDRMask(0, 32),
 			},
-			contains: mustIPs("192.168.0.1", "1.1.1.1"),
+			contains:    mustIPs("192.168.0.1", "1.1.1.1"),
+			notContains: mustIPs("2001:db8::1"),
 		},
 		{
 			prefix: "::/0",
@@ -612,7 +613,8 @@ func TestIPPrefix(t *testing.T) {
 				IP:   net.ParseIP("::"),
 				Mask: net.CIDRMask(0, 128),
 			},
-			contains: mustIPs("::1", "2001:db8::1"),
+			contains:    mustIPs("::1", "2001:db8::1"),
+			notContains: mustIPs("192.0.2.1"),
 		},
 		{
 			prefix: "2000::/3",
