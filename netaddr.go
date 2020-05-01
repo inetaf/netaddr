@@ -616,6 +616,10 @@ func (p IPPrefix) Contains(addr IP) bool {
 		if nn[i]&m != ip[i]&m {
 			return false
 		}
+		// Prevent integer underflow for masks of < /8.
+		if bits < 8 {
+			break
+		}
 		bits -= 8
 	}
 	return true
