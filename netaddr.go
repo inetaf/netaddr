@@ -122,13 +122,24 @@ func IPv4(a, b, c, d uint8) IP {
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
 func ParseIP(s string) (IP, error) {
-	// TODO: do our own parsing to save some allocs? For now,
-	// while showing off new API & representation, just use the
-	// standard library's parsing.
-	ipa, err := net.ResolveIPAddr("ip", s)
-	if err != nil {
-		return IP{}, err
+	var ipa net.IPAddr
+	ipa.IP = net.ParseIP(s)
+	if ipa.IP == nil {
+		// net.ParseIP can't deal with zoned scopes, lets split and try to parse the ip again
+		if index := strings.Index(s, "%"); index > -1 {
+			// handle bad string with % at the end
+			if index == len(s)-1 {
+				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): missing zone", s)
+			}
+			ipa.Zone = s[index+1:]
+			s = s[:index]
+		}
+		ipa.IP = net.ParseIP(s)
+		if ipa.IP == nil {
+			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse ip", s)
+		}
 	}
+
 	if !strings.Contains(s, ":") {
 		if ip4 := ipa.IP.To4(); ip4 != nil {
 			var v4 v4Addr

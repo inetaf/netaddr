@@ -739,10 +739,6 @@ func TestParseIPPrefixError(t *testing.T) {
 			errstr: "no '/'",
 		},
 		{
-			prefix: "1.257.1.1/24",
-			errstr: "lookup 1.257.1.1: no such host", // TODO: improve ParseIP error
-		},
-		{
 			prefix: "1.1.1.0/q",
 			errstr: "bad prefix",
 		},
@@ -764,6 +760,41 @@ func TestParseIPPrefixError(t *testing.T) {
 			_, err := ParseIPPrefix(test.prefix)
 			if err == nil {
 				t.Fatal("no error")
+			}
+			if got := err.Error(); !strings.Contains(got, test.errstr) {
+				t.Errorf("error is missing substring %q: %s", test.errstr, got)
+			}
+		})
+	}
+}
+
+func TestParseIPError(t *testing.T) {
+	tests := []struct {
+		ip     string
+		errstr string
+	}{
+		{
+			ip: "localhost",
+		},
+		{
+			ip: "500.0.0.1",
+		},
+		{
+			ip: "::gggg%eth0",
+		},
+		{
+			ip:     "fe80::1cc0:3e8c:119f:c2e1%",
+			errstr: "missing zone",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.ip, func(t *testing.T) {
+			_, err := ParseIP(test.ip)
+			if err == nil {
+				t.Fatal("no error")
+			}
+			if test.errstr == "" {
+				test.errstr = "unable to parse ip"
 			}
 			if got := err.Error(); !strings.Contains(got, test.errstr) {
 				t.Errorf("error is missing substring %q: %s", test.errstr, got)
