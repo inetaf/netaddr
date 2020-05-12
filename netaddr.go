@@ -125,18 +125,24 @@ func ParseIP(s string) (IP, error) {
 	var ipa net.IPAddr
 	ipa.IP = net.ParseIP(s)
 	if ipa.IP == nil {
-		// net.ParseIP can't deal with zoned scopes, lets split and try to parse the ip again
-		if index := strings.Index(s, "%"); index > -1 {
-			// handle bad string with % at the end
-			if index == len(s)-1 {
-				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): missing zone", s)
+		switch percent := strings.Index(s, "%"); percent {
+		case -1:
+			// handle bad input with no % at all, so the net.ParseIP was not due to a zoned IPv6 fail
+			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse IP", s)
+		case 0:
+			// handle bad input with % at the start
+			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): missing IPv6 address", s)
+		case len(s) - 1:
+			// handle bad input with % at the end
+			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): missing zone", s)
+		default:
+			// net.ParseIP can't deal with zoned scopes, lets split and try to parse the ip again
+			ipa.Zone = s[percent+1:]
+			s = s[:percent]
+			ipa.IP = net.ParseIP(s)
+			if ipa.IP == nil {
+				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse IP", s)
 			}
-			ipa.Zone = s[index+1:]
-			s = s[:index]
-		}
-		ipa.IP = net.ParseIP(s)
-		if ipa.IP == nil {
-			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse ip", s)
 		}
 	}
 
