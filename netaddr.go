@@ -11,10 +11,15 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"math"
 	"net"
 	"strconv"
 	"strings"
+)
+
+// Simple constants copied to avoid importing math.
+const (
+	maxUint8  = 1<<8 - 1
+	maxUint16 = 1<<16 - 1
 )
 
 // Sizes: (64-bit)
@@ -520,8 +525,6 @@ type IPPort struct {
 	Port uint16
 }
 
-const maxUint16 = 1<<16 - 1
-
 // FromStdAddr maps the components of a standard library TCPAddr or
 // UDPAddr into an IPPort.
 func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
@@ -668,7 +671,7 @@ func (p IPPrefix) Contains(addr IP) bool {
 	}
 	bits := p.Bits
 	for i := 0; bits > 0 && i < len(nn); i++ {
-		m := uint8(math.MaxUint8)
+		m := uint8(maxUint8)
 		if bits < 8 {
 			zeros := 8 - bits
 			m = m >> zeros << zeros
