@@ -141,6 +141,90 @@ func TestIPIPAddr(t *testing.T) {
 	}
 }
 
+func TestFromStdIP(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func(net.IP) (IP, bool)
+		std  net.IP
+		want IP
+	}{
+		{
+			name: "v4",
+			fn:   FromStdIP,
+			std:  []byte{1, 2, 3, 4},
+			want: IPv4(1, 2, 3, 4),
+		},
+		{
+			name: "v6",
+			fn:   FromStdIP,
+			std:  net.ParseIP("::1"),
+			want: IPv6Raw([...]byte{15: 1}),
+		},
+		{
+			name: "4in6-unmap",
+			fn:   FromStdIP,
+			std:  net.ParseIP("1.2.3.4"),
+			want: IPv4(1, 2, 3, 4),
+		},
+		{
+			name: "4in6-raw",
+			fn:   FromStdIPRaw,
+			std:  net.ParseIP("1.2.3.4"),
+			want: IPv6Raw([...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := tt.fn(tt.std)
+			if got != tt.want {
+				t.Errorf("got (%#v, %v); want %#v", got, ok, tt.want)
+			}
+		})
+	}
+}
+
+func TestIPFrom16AndIPv6Raw(t *testing.T) {
+	tests := []struct {
+		name string
+		fn   func([16]byte) IP
+		in   [16]byte
+		want IP
+	}{
+		{
+			name: "v6-raw",
+			fn:   IPv6Raw,
+			in:   [...]byte{15: 1},
+			want: IP{v6Addr{15: 1}},
+		},
+		{
+			name: "v6-from16",
+			fn:   IPFrom16,
+			in:   [...]byte{15: 1},
+			want: IP{v6Addr{15: 1}},
+		},
+		{
+			name: "v4-raw",
+			fn:   IPv6Raw,
+			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
+			want: IP{v6Addr{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}},
+		},
+		{
+			name: "v4-from16",
+			fn:   IPFrom16,
+			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
+			want: IPv4(1, 2, 3, 4),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.fn(tt.in)
+			if got != tt.want {
+				t.Errorf("got %#v; want %#v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestFromStdAddr(t *testing.T) {
 	tests := []struct {
 		name string

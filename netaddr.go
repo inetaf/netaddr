@@ -118,6 +118,25 @@ func IPv4(a, b, c, d uint8) IP {
 	return IP{v4Addr{a, b, c, d}}
 }
 
+// IPv6Raw returns the IPv6 address given by the bytes in addr,
+// without an implicit Unmap call to unmap any v6-mapped IPv4
+// address.
+func IPv6Raw(addr [16]byte) IP {
+	return IP{v6Addr(addr)}
+}
+
+// IPFrom16 returns the IP address given by the bytes in addr,
+// unmapping any v6-mapped IPv4 address.
+//
+// It is equivalent to calling IPv6Raw(addr).Unmap() but slightly more
+// efficient.
+func IPFrom16(addr [16]byte) IP {
+	if string(addr[:len(mapped4Prefix)]) == mapped4Prefix {
+		return IPv4(addr[12], addr[13], addr[14], addr[15])
+	}
+	return IP{v6Addr(addr)}
+}
+
 // ParseIP parses s as an IP address, returning the result. The string
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
@@ -145,8 +164,37 @@ func ParseIP(s string) (IP, error) {
 }
 
 // FromStdIP returns an IP from the standard library's IP type.
+//
 // If std is invalid, ok is false.
+//
+// FromStdIP implicitly unmaps IPv6-mapped IPv4 addresses. That is, if
+// len(std) == 16 and contains an IPv4 address, only the IPv4 part is
+// returned, without the IPv6 wrapper. This is the common form returned by
+// the standard library's ParseIP: https://play.golang.org/p/qdjylUkKWxl.
+// To convert a standard library IP without the implicit unmapping, use
+// FromStdIPRaw.
 func FromStdIP(std net.IP) (ip IP, ok bool) {
+	if len(std) == 16 && string(std[:len(mapped4Prefix)]) == mapped4Prefix {
+		std = std[len(mapped4Prefix):]
+	}
+	switch len(std) {
+	case 4:
+		var a v4Addr
+		copy(a[:], std)
+		return IP{a}, true
+	case 16:
+		var a v6Addr
+		copy(a[:], std)
+		return IP{a}, true
+	}
+	return IP{}, false
+}
+
+// FromStdIPRaw returns an IP from the standard library's IP type.
+// If std is invalid, ok is false.
+// Unlike FromStdIP, FromStdIPRaw does not do an implicit Unmap if
+// len(std) == 16 and contains an IPv6-mapped IPv4 address.
+func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 	switch len(std) {
 	case 4:
 		var a v4Addr
@@ -408,6 +456,18 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 		IP:   out,
 		Bits: bits,
 	}, nil
+}
+
+// As16 returns the IP address in its 16 byte representation.
+// IPv4 addresses are returned in their v6-mapped form.
+// IPv6 addresses with zones are returned without their zone (use the
+// Zone method to get it).
+// The ip zero value returns all zeroes.
+func (ip IP) As16() [16]byte {
+	if ip.ipImpl == nil {
+		return [16]byte{}
+	}
+	return ip.ipImpl.as16()
 }
 
 // String returns the string form of the IP address ip.
