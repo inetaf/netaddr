@@ -167,10 +167,21 @@ func TestFromStdIP(t *testing.T) {
 			want: IPv4(1, 2, 3, 4),
 		},
 		{
+			name: "v4-raw",
+			fn:   FromStdIPRaw,
+			std:  net.ParseIP("1.2.3.4").To4(),
+			want: IPv4(1, 2, 3, 4),
+		},
+		{
 			name: "4in6-raw",
 			fn:   FromStdIPRaw,
 			std:  net.ParseIP("1.2.3.4"),
 			want: IPv6Raw([...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}),
+		},
+		{
+			name: "bad-raw",
+			fn:   FromStdIPRaw,
+			std:  net.IP{0xff},
 		},
 	}
 	for _, tt := range tests {
