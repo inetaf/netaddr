@@ -136,9 +136,8 @@ func ParseIP(s string) (IP, error) {
 			// handle bad input with % at the end
 			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): missing zone", s)
 		default:
-			// net.ParseIP can't deal with zoned scopes, lets split and try to parse the ip again
-			ipa.Zone = s[percent+1:]
-			s = s[:percent]
+			// net.ParseIP can't deal with zoned scopes, let's split and try to parse the IP again
+			s, ipa.Zone = s[:percent], s[percent+1:]
 			ipa.IP = net.ParseIP(s)
 			if ipa.IP == nil {
 				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse IP", s)
