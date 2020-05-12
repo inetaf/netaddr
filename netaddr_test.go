@@ -153,7 +153,7 @@ func TestFromStdAddr(t *testing.T) {
 				IP:   net.ParseIP("1.2.3.4"),
 				Port: 567,
 			},
-			want: IPPort{mustIP("1.2.3.4").Unmap(), 567},
+			want: IPPort{mustIP("1.2.3.4"), 567},
 		},
 		{
 			name: "v6",
@@ -161,7 +161,7 @@ func TestFromStdAddr(t *testing.T) {
 				IP:   net.ParseIP("::1"),
 				Port: 567,
 			},
-			want: IPPort{mustIP("::1").Unmap(), 567},
+			want: IPPort{mustIP("::1"), 567},
 		},
 		{
 			name: "v6zone",
@@ -170,7 +170,7 @@ func TestFromStdAddr(t *testing.T) {
 				Port: 567,
 				Zone: "foo",
 			},
-			want: IPPort{mustIP("::1").Unmap().WithZone("foo"), 567},
+			want: IPPort{mustIP("::1").WithZone("foo"), 567},
 		},
 		{
 			name: "v4zone_bad",
