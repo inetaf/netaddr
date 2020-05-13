@@ -891,7 +891,7 @@ func TestParseIPPrefixError(t *testing.T) {
 		},
 		{
 			prefix: "1.257.1.1/24",
-			errstr: "lookup 1.257.1.1: no such host", // TODO: improve ParseIP error
+			errstr: "unable to parse IP",
 		},
 		{
 			prefix: "1.1.1.0/q",
@@ -915,6 +915,45 @@ func TestParseIPPrefixError(t *testing.T) {
 			_, err := ParseIPPrefix(test.prefix)
 			if err == nil {
 				t.Fatal("no error")
+			}
+			if got := err.Error(); !strings.Contains(got, test.errstr) {
+				t.Errorf("error is missing substring %q: %s", test.errstr, got)
+			}
+		})
+	}
+}
+
+func TestParseIPError(t *testing.T) {
+	tests := []struct {
+		ip     string
+		errstr string
+	}{
+		{
+			ip: "localhost",
+		},
+		{
+			ip: "500.0.0.1",
+		},
+		{
+			ip: "::gggg%eth0",
+		},
+		{
+			ip:     "fe80::1cc0:3e8c:119f:c2e1%",
+			errstr: "missing zone",
+		},
+		{
+			ip:     "%eth0",
+			errstr: "missing IPv6 address",
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.ip, func(t *testing.T) {
+			_, err := ParseIP(test.ip)
+			if err == nil {
+				t.Fatal("no error")
+			}
+			if test.errstr == "" {
+				test.errstr = "unable to parse IP"
 			}
 			if got := err.Error(); !strings.Contains(got, test.errstr) {
 				t.Errorf("error is missing substring %q: %s", test.errstr, got)
@@ -1035,5 +1074,33 @@ func BenchmarkIPv4Contains(b *testing.B) {
 	ip := IPv4(192, 168, 1, 1)
 	for i := 0; i < b.N; i++ {
 		prefix.Contains(ip)
+	}
+}
+
+func BenchmarkParseIPv4(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		ParseIP("192.168.1.1")
+	}
+}
+
+func BenchmarkParseIPv6(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		ParseIP("fe80::1cc0:3e8c:119f:c2e1%ens18")
+	}
+}
+
+func BenchmarkStdParseIPv4(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		net.ParseIP("192.168.1.1")
+	}
+}
+
+func BenchmarkStdParseIPv6(b *testing.B) {
+	b.ReportAllocs()
+	for i := 0; i < b.N; i++ {
+		net.ParseIP("fe80::1cc0:3e8c:119f:c2e1")
 	}
 }
