@@ -722,6 +722,17 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("192.168.1.2"),
 		},
 		{
+			prefix: "100.64.0.0/10", // CGNAT range; prefix not multiple of 8
+			ip:     mustIP("100.64.0.0"),
+			bits:   10,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("100.64.0.0"),
+				Mask: net.CIDRMask(10, 32),
+			},
+			contains:    mustIPs("100.64.0.0", "100.64.0.1", "100.81.251.94", "100.100.100.100", "100.127.255.254", "100.127.255.255"),
+			notContains: mustIPs("100.63.255.255", "100.128.0.0"),
+		},
+		{
 			prefix: "2001:db8::/96",
 			ip:     mustIP("2001:db8::"),
 			bits:   96,
