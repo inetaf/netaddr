@@ -508,6 +508,12 @@ func TestIPPrefixMasking(t *testing.T) {
 				p:    mustIPPrefix(fmt.Sprintf("fe80::dead:beef:0:0%s/96", zone)),
 				ok:   true,
 			},
+			{
+				ip:   mustIP(fmt.Sprintf("::%s", zone)),
+				bits: 63,
+				p:    mustIPPrefix(fmt.Sprintf("::%s/63", zone)),
+				ok:   true,
+			},
 		}
 	}
 
@@ -544,6 +550,12 @@ func TestIPPrefixMasking(t *testing.T) {
 					ip:   mustIP("255.255.255.255"),
 					bits: 20,
 					p:    mustIPPrefix("255.255.240.0/20"),
+					ok:   true,
+				},
+				{
+					ip:   mustIP("0.0.0.0"),
+					bits: 15,
+					p:    mustIPPrefix("0.0.0.0/15"),
 					ok:   true,
 				},
 			},

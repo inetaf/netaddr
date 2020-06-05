@@ -450,7 +450,10 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 			continue
 		}
 
-		b[i] = ^byte(0xff >> n)
+		// Don't mask off all-zero bytes.
+		if b[i] != 0 {
+			b[i] = ^byte(0xff >> n)
+		}
 		n = 0
 	}
 
