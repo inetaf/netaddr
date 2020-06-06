@@ -509,10 +509,10 @@ func TestIPPrefixMasking(t *testing.T) {
 				ok:   true,
 			},
 			{
-				ip: mustIP(fmt.Sprintf("aaaa::%s", zone)),
+				ip:   mustIP(fmt.Sprintf("aaaa::%s", zone)),
 				bits: 4,
-				p: mustIPPrefix(fmt.Sprintf("a000::%s/4", zone)),
-				ok: true,
+				p:    mustIPPrefix(fmt.Sprintf("a000::%s/4", zone)),
+				ok:   true,
 			},
 			{
 				ip:   mustIP(fmt.Sprintf("::%s", zone)),
@@ -561,10 +561,10 @@ func TestIPPrefixMasking(t *testing.T) {
 				{
 					// Partially masking one byte that contains both
 					// 1s and 0s on either side of the mask limit.
-					ip: mustIP("100.98.156.66"),
+					ip:   mustIP("100.98.156.66"),
 					bits: 10,
-					p: mustIPPrefix("100.64.0.0/10"),
-					ok: true,
+					p:    mustIPPrefix("100.64.0.0/10"),
+					ok:   true,
 				},
 			},
 		},
@@ -1133,5 +1133,54 @@ func BenchmarkStdParseIPv6(b *testing.B) {
 	b.ReportAllocs()
 	for i := 0; i < b.N; i++ {
 		net.ParseIP("fe80::1cc0:3e8c:119f:c2e1")
+	}
+}
+
+func BenchmarkIPPrefixMasking(b *testing.B) {
+	tests := []struct {
+		name string
+		ip   IP
+		bits uint8
+	}{
+		{
+			name: "IPv4 /32",
+			ip:   IPv4(192, 0, 2, 0),
+			bits: 32,
+		},
+		{
+			name: "IPv4 /17",
+			ip:   IPv4(192, 0, 2, 0),
+			bits: 17,
+		},
+		{
+			name: "IPv6 /128",
+			ip:   mustIP("2001:db8::1"),
+			bits: 128,
+		},
+		{
+			name: "IPv6 /65",
+			ip:   mustIP("2001:db8::1"),
+			bits: 65,
+		},
+		{
+			name: "IPv6 zone /128",
+			ip:   mustIP("2001:db8::1%eth0"),
+			bits: 128,
+		},
+		{
+			name: "IPv6 zone /65",
+			ip:   mustIP("2001:db8::1%eth0"),
+			bits: 65,
+		},
+	}
+
+	for _, tt := range tests {
+		b.Run(tt.name, func(b *testing.B) {
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				tt.ip.Prefix(tt.bits)
+			}
+		})
 	}
 }
