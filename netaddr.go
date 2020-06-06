@@ -445,7 +445,6 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 	n := bits
 	for i := 0; i < len(b); i++ {
 		if n >= 8 {
-			b[i] &= 0xff
 			n -= 8
 			continue
 		}
