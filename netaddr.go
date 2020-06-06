@@ -445,13 +445,14 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 	n := bits
 	for i := 0; i < len(b); i++ {
 		if n >= 8 {
-			b[i] &= 0xff
+			// Skip over all bytes that we're not masking at all.
 			n -= 8
-			continue
+		} else {
+			// Apply a mask that zeroes the lower (8-n) bits of the
+			// byte.
+			b[i] = b[i] & ^byte(0xff>>n)
+			n = 0
 		}
-
-		b[i] = ^byte(0xff >> n)
-		n = 0
 	}
 
 	var out IP
