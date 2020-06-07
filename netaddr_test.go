@@ -1153,6 +1153,11 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 			bits: 17,
 		},
 		{
+			name: "IPv4 /0",
+			ip:   IPv4(192, 0, 2, 0),
+			bits: 0,
+		},
+		{
 			name: "IPv6 /128",
 			ip:   mustIP("2001:db8::1"),
 			bits: 128,
@@ -1163,6 +1168,11 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 			bits: 65,
 		},
 		{
+			name: "IPv6 /0",
+			ip:   mustIP("2001:db8::1"),
+			bits: 0,
+		},
+		{
 			name: "IPv6 zone /128",
 			ip:   mustIP("2001:db8::1%eth0"),
 			bits: 128,
@@ -1171,6 +1181,11 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 			name: "IPv6 zone /65",
 			ip:   mustIP("2001:db8::1%eth0"),
 			bits: 65,
+		},
+		{
+			name: "IPv6 zone /0",
+			ip:   mustIP("2001:db8::1%eth0"),
+			bits: 0,
 		},
 	}
 
