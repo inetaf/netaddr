@@ -45,6 +45,8 @@ type ipImpl interface {
 	is6() bool
 	is4in6() bool
 	as16() [16]byte
+	// prefix is the type-specific implementation of IP.Prefix.
+	prefix(uint8) (IPPrefix, error)
 	String() string
 }
 
@@ -63,6 +65,20 @@ func (ip v4Addr) as16() [16]byte {
 		15: ip[3],
 	}
 }
+func (ip v4Addr) prefix(bits uint8) (IPPrefix, error) {
+	if bits > 32 {
+		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
+	}
+	skip, partial := int(bits/8),bits%8
+	if partial != 0 {
+		ip[skip] = ip[skip] & ^byte(0xff >> partial)
+		skip++
+	}
+	for i := skip; i < 4; i++ {
+		ip[i] = 0
+	}
+	return IPPrefix{IP{ip}, bits}, nil
+}
 func (ip v4Addr) String() string { return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]) }
 
 const (
@@ -79,6 +95,21 @@ func (v6Addr) is4() bool         { return false }
 func (v6Addr) is6() bool         { return true }
 func (ip v6Addr) is4in6() bool   { return string(ip[:len(mapped4Prefix)]) == mapped4Prefix }
 func (ip v6Addr) as16() [16]byte { return ip }
+func (ip v6Addr) prefix(bits uint8) (IPPrefix, error) {
+	if bits > 128 {
+		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
+	}
+	skip, partial := int(bits/8), bits%8
+	if partial != 0 {
+		ip[skip] = ip[skip] & ^byte(0xff >> partial)
+		skip++
+	}
+	b := ip[skip:]
+	for i := range b {
+		b[i] = 0
+	}
+	return IPPrefix{IP{ip}, bits}, nil
+}
 func (ip v6Addr) String() string {
 	// TODO: better implementation; don't jump through these hoops
 	// and pay these allocs just to share a bit of code with
@@ -97,6 +128,21 @@ type v6AddrZone struct {
 	zone string
 }
 
+func (ip v6AddrZone) prefix(bits uint8) (IPPrefix, error) {
+	if bits > 128 {
+		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
+	}
+	skip, partial := int(bits/8), bits%8
+	if partial != 0 {
+		ip.v6Addr[skip] = ip.v6Addr[skip] & ^byte(0xff >> partial)
+		skip++
+	}
+	b := ip.v6Addr[skip:]
+	for i := range b {
+		b[i] = 0
+	}
+	return IPPrefix{IP{ip}, bits}, nil
+}
 func (ip v6AddrZone) String() string {
 	// TODO: better implementation
 	return (&net.IPAddr{IP: net.IP(ip.v6Addr[:]), Zone: ip.zone}).String()
@@ -417,67 +463,10 @@ func (ip IP) IsMulticast() bool {
 // a nil error are returned. If bits is larger than 32 for an IPv4 address or
 // 128 for an IPv6 address, an error is returned.
 func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
-	maxBits := uint8(32)
-	if ip.Is6() {
-		maxBits = 128
-	}
-
-	if bits > maxBits {
-		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
-	}
-
-	var b []byte
-	switch ip := ip.ipImpl.(type) {
-	case nil:
-		// Zero-value input produces zero-value output.
+	if ip.ipImpl == nil {
 		return IPPrefix{}, nil
-	case v4Addr:
-		b = ip[:]
-	case v6Addr:
-		b = ip[:]
-	case v6AddrZone:
-		b = ip.v6Addr[:]
-	default:
-		panic("netaddr: unhandled ipImpl representation")
 	}
-
-	// Apply the mask specified by bits.
-	n := bits
-	for i := 0; i < len(b); i++ {
-		if n >= 8 {
-			// Skip over all bytes that we're not masking at all.
-			n -= 8
-		} else {
-			// Apply a mask that zeroes the lower (8-n) bits of the
-			// byte.
-			b[i] = b[i] & ^byte(0xff>>n)
-			n = 0
-		}
-	}
-
-	var out IP
-	switch ip.ipImpl.(type) {
-	case v4Addr:
-		var v4 v4Addr
-		copy(v4[:], b)
-		out = IP{ipImpl: v4}
-	case v6Addr:
-		var v6 v6Addr
-		copy(v6[:], b)
-		out = IP{ipImpl: v6}
-	case v6AddrZone:
-		var v6 v6AddrZone
-		copy(v6.v6Addr[:], b)
-		v6.zone = ip.Zone()
-		out = IP{ipImpl: v6}
-	default:
-		panic("netaddr: unhandled ipImpl representation")
-	}
-
-	return IPPrefix{
-		IP:   out,
-		Bits: bits,
-	}, nil
+	return ip.prefix(bits)
 }
 
 // As16 returns the IP address in its 16 byte representation.
