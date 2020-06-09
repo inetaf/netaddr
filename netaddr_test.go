@@ -532,7 +532,7 @@ func TestIPPrefixMasking(t *testing.T) {
 			subtests: []subtest{
 				{
 					bits: 255,
-					ok: true,
+					ok:   true,
 				},
 				{
 					bits: 16,
