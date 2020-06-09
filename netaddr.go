@@ -69,9 +69,9 @@ func (ip v4Addr) prefix(bits uint8) (IPPrefix, error) {
 	if bits > 32 {
 		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
 	}
-	skip, partial := int(bits/8),bits%8
+	skip, partial := int(bits/8), bits%8
 	if partial != 0 {
-		ip[skip] = ip[skip] & ^byte(0xff >> partial)
+		ip[skip] = ip[skip] & ^byte(0xff>>partial)
 		skip++
 	}
 	for i := skip; i < 4; i++ {
@@ -101,7 +101,7 @@ func (ip v6Addr) prefix(bits uint8) (IPPrefix, error) {
 	}
 	skip, partial := int(bits/8), bits%8
 	if partial != 0 {
-		ip[skip] = ip[skip] & ^byte(0xff >> partial)
+		ip[skip] = ip[skip] & ^byte(0xff>>partial)
 		skip++
 	}
 	b := ip[skip:]
@@ -134,7 +134,7 @@ func (ip v6AddrZone) prefix(bits uint8) (IPPrefix, error) {
 	}
 	skip, partial := int(bits/8), bits%8
 	if partial != 0 {
-		ip.v6Addr[skip] = ip.v6Addr[skip] & ^byte(0xff >> partial)
+		ip.v6Addr[skip] = ip.v6Addr[skip] & ^byte(0xff>>partial)
 		skip++
 	}
 	b := ip.v6Addr[skip:]
