@@ -542,7 +542,7 @@ func ParseIPPort(s string) (IPPort, error) {
 	}
 	port16, err := strconv.ParseUint(port, 10, 16)
 	if err != nil {
-		return ipp, fmt.Errorf("invalid port %q: %w", port, err)
+		return ipp, fmt.Errorf("invalid port %q parsing %q", port, s)
 	}
 	ipp.Port = uint16(port16)
 	ipp.IP, err = ParseIP(ip)
