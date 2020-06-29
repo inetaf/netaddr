@@ -531,6 +531,35 @@ type IPPort struct {
 	Port uint16
 }
 
+// ParseIPPort parses s as an IPPort.
+//
+// It doesn't do any name resolution, and ports must be numeric.
+func ParseIPPort(s string) (IPPort, error) {
+	var ipp IPPort
+	ip, port, err := net.SplitHostPort(s)
+	if err != nil {
+		return ipp, err
+	}
+	port16, err := strconv.ParseUint(port, 10, 16)
+	if err != nil {
+		return ipp, fmt.Errorf("invalid port %q: %w", port, err)
+	}
+	ipp.Port = uint16(port16)
+	ipp.IP, err = ParseIP(ip)
+	if err != nil {
+		return IPPort{}, err
+	}
+	return ipp, nil
+}
+
+func (p IPPort) String() string {
+	if v4, ok := p.IP.ipImpl.(v4Addr); ok {
+		return fmt.Sprintf("%d.%d.%d.%d:%d", v4[0], v4[1], v4[2], v4[3], p.Port)
+	}
+	// TODO: this could be more efficient allocation-wise:
+	return net.JoinHostPort(p.IP.String(), strconv.Itoa(int(p.Port)))
+}
+
 // FromStdAddr maps the components of a standard library TCPAddr or
 // UDPAddr into an IPPort.
 func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {

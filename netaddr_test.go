@@ -994,6 +994,37 @@ func TestParseIPError(t *testing.T) {
 	}
 }
 
+func TestParseIPPort(t *testing.T) {
+	tests := []struct {
+		in      string
+		want    IPPort
+		wantErr bool
+	}{
+		{in: "1.2.3.4:1234", want: IPPort{mustIP("1.2.3.4"), 1234}},
+		{in: "1.1.1.1:123456", wantErr: true},
+		{in: "1.1.1.1:-123", wantErr: true},
+		{in: "[::1]:1234", want: IPPort{mustIP("::1"), 1234}},
+		{in: ":0", wantErr: true}, // if we need to parse this form, there should be a separate function that explicitly allows it
+	}
+	for _, test := range tests {
+		t.Run(test.in, func(t *testing.T) {
+			got, err := ParseIPPort(test.in)
+			if err != nil {
+				if test.wantErr {
+					return
+				}
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Errorf("got %v; want %v", got, test.want)
+			}
+			if got.String() != test.in {
+				t.Errorf("String = %q; want %q", got.String(), test.in)
+			}
+		})
+	}
+}
+
 func mustIP(s string) IP {
 	ip, err := ParseIP(s)
 	if err != nil {
