@@ -14,6 +14,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 // Simple constants copied to avoid importing math.
@@ -319,20 +320,20 @@ func (ip IP) Less(ip2 IP) bool {
 	}
 }
 
-func (ip IP) ipZone() (stdIP net.IP, zone string) {
+// ipZone returns the standard library net.IP from ip, as well
+// as the zone.
+// The optional reuse IP provides memory to reuse.
+func (ip IP) ipZone(reuse net.IP) (stdIP net.IP, zone string) {
+	base := reuse[:0]
 	switch ip := ip.ipImpl.(type) {
 	case nil:
 		return nil, ""
 	case v4Addr:
-		return net.IP{ip[0], ip[1], ip[2], ip[3]}, ""
+		return append(base, ip[0], ip[1], ip[2], ip[3]), ""
 	case v6Addr:
-		stdIP = make(net.IP, net.IPv6len)
-		copy(stdIP, ip[:])
-		return stdIP, ""
+		return append(base, ip[:]...), ""
 	case v6AddrZone:
-		stdIP = make(net.IP, net.IPv6len)
-		copy(stdIP, ip.v6Addr[:])
-		return stdIP, ip.zone
+		return append(base, ip.v6Addr[:]...), ip.zone
 	default:
 		panic("netaddr: unhandled ipImpl representation")
 	}
@@ -342,7 +343,7 @@ func (ip IP) ipZone() (stdIP net.IP, zone string) {
 // always non-nil, but the IPAddr.IP will be nil if ip is the zero value.
 // If ip contains a zone identifier, IPAddr.Zone is populated.
 func (ip IP) IPAddr() *net.IPAddr {
-	stdIP, zone := ip.ipZone()
+	stdIP, zone := ip.ipZone(nil)
 	return &net.IPAddr{IP: stdIP, Zone: zone}
 }
 
@@ -580,23 +581,34 @@ func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
 	return ipp, true
 }
 
+var udpAddrPool = &sync.Pool{
+	New: func() interface{} { return new(net.UDPAddr) },
+}
+
 // UDPAddr returns a standard library net.UDPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero
 // value, then UDPAddr.IP is nil.
+//
+// UDPAddr necessarily does two allocations. If you call PutUDPAddr
+// after you're done with it, though, then subsequent UDPAddr calls
+// can reuse the memory.
 func (p IPPort) UDPAddr() *net.UDPAddr {
-	ip, zone := p.IP.ipZone()
-	return &net.UDPAddr{
-		IP:   ip,
-		Port: int(p.Port),
-		Zone: zone,
-	}
+	ua := udpAddrPool.Get().(*net.UDPAddr)
+	ua.Port = int(p.Port)
+	ua.IP, ua.Zone = p.IP.ipZone(ua.IP)
+	return ua
 }
+
+// PutUDPAddr adds ua to an internal pool for later reuse by IPPort.UDPAddr.
+// Use of PutUDPAddr is optional; improper use can cause mysterious errors.
+// You must only call PutUDPAddr if there are no remaining references to ua.
+func PutUDPAddr(ua *net.UDPAddr) { udpAddrPool.Put(ua) }
 
 // TCPAddr returns a standard library net.UDPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero
 // value, then TCPAddr.IP is nil.
 func (p IPPort) TCPAddr() *net.TCPAddr {
-	ip, zone := p.IP.ipZone()
+	ip, zone := p.IP.ipZone(nil)
 	return &net.TCPAddr{
 		IP:   ip,
 		Port: int(p.Port),
@@ -676,7 +688,7 @@ func (p IPPrefix) IPNet() *net.IPNet {
 	if p.IP.Is4() {
 		bits = 32
 	}
-	stdIP, _ := p.IP.ipZone()
+	stdIP, _ := p.IP.ipZone(nil)
 	return &net.IPNet{
 		IP:   stdIP,
 		Mask: net.CIDRMask(int(p.Bits), bits),

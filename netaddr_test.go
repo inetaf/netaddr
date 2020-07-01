@@ -1025,6 +1025,25 @@ func TestParseIPPort(t *testing.T) {
 	}
 }
 
+func TestUDPAddrAllocs(t *testing.T) {
+	for _, ep := range []string{"1.2.3.4:1234", "[::1]:1234"} {
+		ipp, err := ParseIPPort(ep)
+		if err != nil {
+			t.Fatalf("invalid %q", ep)
+		}
+		n := int(testing.AllocsPerRun(1000, func() {
+			ua := ipp.UDPAddr()
+			if ua.Port != int(ipp.Port) {
+				t.Fatal("UDPAddr returned bogus result")
+			}
+			PutUDPAddr(ua)
+		}))
+		if n > 0 {
+			t.Errorf("%d allocs for %q", n, ep)
+		}
+	}
+}
+
 func mustIP(s string) IP {
 	ip, err := ParseIP(s)
 	if err != nil {
