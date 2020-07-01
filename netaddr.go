@@ -553,6 +553,11 @@ func ParseIPPort(s string) (IPPort, error) {
 	return ipp, nil
 }
 
+// IsZero reports whether IPPort is its zero value.
+func (p IPPort) IsZero() bool {
+	return p.Port == 0 && p.IP.ipImpl == nil
+}
+
 func (p IPPort) String() string {
 	if v4, ok := p.IP.ipImpl.(v4Addr); ok {
 		return fmt.Sprintf("%d.%d.%d.%d:%d", v4[0], v4[1], v4[2], v4[3], p.Port)
