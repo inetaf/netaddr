@@ -276,6 +276,10 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 	return IP{}, false
 }
 
+// IsZero reports whether ip is its zero value. The IP zero value is
+// not a valid IP address of any type.
+func (ip IP) IsZero() bool { return ip == IP{} }
+
 // Zone returns ip's IPv6 scoped addressing zone, if any.
 func (ip IP) Zone() string {
 	if v6z, ok := ip.ipImpl.(v6AddrZone); ok {
@@ -553,10 +557,8 @@ func ParseIPPort(s string) (IPPort, error) {
 	return ipp, nil
 }
 
-// IsZero reports whether IPPort is its zero value.
-func (p IPPort) IsZero() bool {
-	return p.Port == 0 && p.IP.ipImpl == nil
-}
+// IsZero reports whether p is its zero value.
+func (p IPPort) IsZero() bool { return p == IPPort{} }
 
 func (p IPPort) String() string {
 	if v4, ok := p.IP.ipImpl.(v4Addr); ok {
@@ -629,6 +631,9 @@ type IPPrefix struct {
 	IP   IP
 	Bits uint8
 }
+
+// IsZero reports whether p is its zero value.
+func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
 
 // FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
 // If std is invalid, ok is false.
