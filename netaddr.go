@@ -486,6 +486,24 @@ func (ip IP) As16() [16]byte {
 	return ip.ipImpl.as16()
 }
 
+// As4 returns an IPv4 or IPv4-in-IPv6 address in its 4 byte representation.
+// If ip is the IP zero value or an IPv6 address, As4 panics.
+// Note that 0.0.0.0 is not the zero value.
+func (ip IP) As4() [4]byte {
+	if ip.ipImpl == nil {
+		panic("As4 called on IP zero value")
+	}
+	switch v := ip.ipImpl.(type) {
+	case v4Addr:
+		return v
+	case v6Addr:
+		if v.is4in6() {
+			return [4]byte{v[12], v[13], v[14], v[15]}
+		}
+	}
+	panic("As4 called on IPv6 address")
+}
+
 // String returns the string form of the IP address ip.
 // It returns one of 4 forms:
 //

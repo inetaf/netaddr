@@ -1250,3 +1250,48 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 		})
 	}
 }
+
+func TestAs4(t *testing.T) {
+	tests := []struct {
+		ip        IP
+		want      [4]byte
+		wantPanic bool
+	}{
+		{
+			ip:   mustIP("1.2.3.4"),
+			want: [4]byte{1, 2, 3, 4},
+		},
+		{
+			ip:   IPv6Raw(mustIP("1.2.3.4").As16()), // IPv4-in-IPv6
+			want: [4]byte{1, 2, 3, 4},
+		},
+		{
+			ip:   mustIP("0.0.0.0"),
+			want: [4]byte{0, 0, 0, 0},
+		},
+		{
+			ip:        mustIP("::1"),
+			wantPanic: true,
+		},
+	}
+	as4 := func(ip IP) (v [4]byte, gotPanic bool) {
+		defer func() {
+			if recover() != nil {
+				gotPanic = true
+				return
+			}
+		}()
+		v = ip.As4()
+		return
+	}
+	for i, tt := range tests {
+		got, gotPanic := as4(tt.ip)
+		if gotPanic != tt.wantPanic {
+			t.Errorf("%d. panic on %v = %v; want %v", i, tt.ip, gotPanic, tt.wantPanic)
+			continue
+		}
+		if got != tt.want {
+			t.Errorf("%d. %v = %v; want %v", i, tt.ip, got, tt.want)
+		}
+	}
+}
