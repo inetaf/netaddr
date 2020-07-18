@@ -727,8 +727,12 @@ func (p IPPrefix) IPNet() *net.IPNet {
 //
 // An IPv4 address will not match an IPv6 prefix.
 // A 4-in-6 IP will not match an IPv4 prefix.
+// A zero-value IP will not match any prefix.
 func (p IPPrefix) Contains(addr IP) bool {
 	var nn, ip []byte // these do not escape and so do not allocate
+	if addr.ipImpl == nil {
+		return false
+	}
 	if p.IP.is4() {
 		if !addr.is4() {
 			return false
