@@ -711,6 +711,33 @@ func TestIs4In6(t *testing.T) {
 	}
 }
 
+func TestIPPrefixNormalize(t *testing.T) {
+	tests := []struct {
+		prefix string
+		ip     IP
+	}{
+		{
+			prefix: "192.168.0.255/24",
+			ip:     mustIP("192.168.0.0"),
+		},
+		{
+			prefix: "2100::/3",
+			ip:     mustIP("2000::"),
+		},
+	}
+	for _, test := range tests {
+		t.Run(test.prefix, func(t *testing.T) {
+			prefix, err := ParseIPPrefix(test.prefix)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if prefix.IP != test.ip {
+				t.Errorf("IP=%s, want %s", prefix.IP, test.ip)
+			}
+		})
+	}
+}
+
 func TestIPPrefix(t *testing.T) {
 	tests := []struct {
 		prefix      string
@@ -905,8 +932,8 @@ func TestParseIPPrefixAllocs(t *testing.T) {
 			prefixAllocs := int(testing.AllocsPerRun(5, func() {
 				ParseIPPrefix(prefix)
 			}))
-			if got := prefixAllocs - ipAllocs; got != 0 {
-				t.Errorf("allocs=%d, want 0", got)
+			if got := prefixAllocs - ipAllocs; got != 1 {
+				t.Errorf("allocs=%d, want 1", got)
 			}
 		})
 	}
