@@ -710,7 +710,7 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 	}, nil
 }
 
-// Masked returns p in its canonical form, with bits of of p.IP not in p.Bits masked off.
+// Masked returns p in its canonical form, with bits of p.IP not in p.Bits masked off.
 // If p is zero or otherwise invalid, Masked returns the zero value.
 func (p IPPrefix) Masked() IPPrefix {
 	if m, err := p.IP.Prefix(p.Bits); err == nil {
