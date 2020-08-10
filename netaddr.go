@@ -681,6 +681,8 @@ func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
 // ParseIPPrefix parses s as an IP address prefix.
 // The string can be in the form "192.168.1.0/24" or "2001::db8::/32",
 // the CIDR notation defined in RFC 4632 and RFC 4291.
+//
+// Note that masked address bits are not zeroed. Use Masked for that.
 func ParseIPPrefix(s string) (IPPrefix, error) {
 	i := strings.IndexByte(s, '/')
 	if i < 0 {
@@ -706,6 +708,15 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 		IP:   ip,
 		Bits: uint8(bits),
 	}, nil
+}
+
+// Masked returns p in its canonical form, with bits of of p.IP not in p.Bits masked off.
+// If p is zero or otherwise invalid, Masked returns the zero value.
+func (p IPPrefix) Masked() IPPrefix {
+	if m, err := p.IP.Prefix(p.Bits); err == nil {
+		return m
+	}
+	return IPPrefix{}
 }
 
 // IPNet returns the net.IPNet representation of an IPPrefix.
