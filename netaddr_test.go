@@ -1323,3 +1323,45 @@ func TestAs4(t *testing.T) {
 		}
 	}
 }
+
+func TestIPPrefixOverlaps(t *testing.T) {
+	pfx := mustIPPrefix
+	tests := []struct {
+		a, b IPPrefix
+		want bool
+	}{
+		{IPPrefix{}, pfx("1.2.0.0/16"), false},  // first zero
+		{pfx("1.2.0.0/16"), IPPrefix{}, false},  // second zero
+		{pfx("::0/3"), pfx("0.0.0.0/3"), false}, // different families
+
+		{pfx("1.2.0.0/16"), pfx("1.2.0.0/16"), true}, // equal
+
+		{pfx("1.2.0.0/16"), pfx("1.2.3.0/24"), true},
+		{pfx("1.2.3.0/24"), pfx("1.2.0.0/16"), true},
+
+		{pfx("1.2.0.0/16"), pfx("1.2.3.0/32"), true},
+		{pfx("1.2.3.0/32"), pfx("1.2.0.0/16"), true},
+
+		// Match /0 either order
+		{pfx("1.2.3.0/32"), pfx("0.0.0.0/0"), true},
+		{pfx("0.0.0.0/0"), pfx("1.2.3.0/32"), true},
+
+		{pfx("1.2.3.0/32"), pfx("5.5.5.5/0"), true}, // normalization not required; /0 means true
+
+		// IPv6 overlapping
+		{pfx("5::1/128"), pfx("5::0/8"), true},
+		{pfx("5::0/8"), pfx("5::1/128"), true},
+
+		// IPv6 not overlapping
+		{pfx("1::1/128"), pfx("2::2/128"), false},
+		{pfx("0100::0/8"), pfx("::1/128"), false},
+
+		// v6-mapped v4 should not overlap with IPv4.
+		{IPPrefix{IP: IPv6Raw(mustIP("1.2.0.0").As16()), Bits: 16}, pfx("1.2.3.0/24"), false},
+	}
+	for i, tt := range tests {
+		if got := tt.a.Overlaps(tt.b); got != tt.want {
+			t.Errorf("%d. (%v).Overlaps(%v) = %v; want %v", i, tt.a, tt.b, got, tt.want)
+		}
+	}
+}

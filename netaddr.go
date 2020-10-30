@@ -471,6 +471,8 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 	if ip.ipImpl == nil {
 		return IPPrefix{}, nil
 	}
+	// TODO: optimize this to return ip directly if it's already
+	// masked and to not allocate a new IP.ipImpl.
 	return ip.prefix(bits)
 }
 
@@ -737,7 +739,7 @@ func (p IPPrefix) IPNet() *net.IPNet {
 // Contains reports whether the network p includes addr.
 //
 // An IPv4 address will not match an IPv6 prefix.
-// A 4-in-6 IP will not match an IPv4 prefix.
+// A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
 func (p IPPrefix) Contains(addr IP) bool {
 	var nn, ip []byte // these do not escape and so do not allocate
@@ -776,6 +778,46 @@ func (p IPPrefix) Contains(addr IP) bool {
 		bits -= 8
 	}
 	return true
+}
+
+// Overlaps reports whether p and o overlap at all.
+//
+// If p and o are of different address families or either have a zero
+// IP, it reports false. Like the Contains method, a prefix with a
+// v6-mapped IPv4 IP is still treated as an IPv6 mask.
+//
+// If either has a Bits of zero, it returns true.
+func (p IPPrefix) Overlaps(o IPPrefix) bool {
+	if p.IP.IsZero() || o.IP.IsZero() {
+		return false
+	}
+	if p == o {
+		return true
+	}
+	if p.IP.Is4() != o.IP.Is4() {
+		return false
+	}
+	var minBits uint8
+	if p.Bits < o.Bits {
+		minBits = p.Bits
+	} else {
+		minBits = o.Bits
+	}
+	if minBits == 0 {
+		return true
+	}
+	// One of these Prefix calls might look redundant, but we don't require
+	// that p and o values are normalized (via IPPrefix.Masked) first,
+	// so the Prefix call on the one that's already minBits serves to zero
+	// out any remaining bits in IP.
+	var err error
+	if p, err = p.IP.Prefix(minBits); err != nil {
+		return false
+	}
+	if o, err = o.IP.Prefix(minBits); err != nil {
+		return false
+	}
+	return p.IP == o.IP
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,
