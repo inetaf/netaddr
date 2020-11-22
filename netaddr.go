@@ -301,14 +301,18 @@ func (ip IP) Less(ip2 IP) bool {
 		return false
 	}
 
+	a4, b4 := a.Is4(), b.Is4()
+	if a4 != b4 {
+		// When address families differ, IPv4 sorts first.
+		return a4
+	}
+
 	// At this point, a and b are both either v4 or v6.
 
-	if a4, ok := a.ipImpl.(v4Addr); ok {
-		if b4, ok := b.ipImpl.(v4Addr); ok {
-			return bytes.Compare(a4[:], b4[:]) < 0
-		}
-		// v4 sorts before v6.
-		return true
+	// Both IPv4.
+	if a4 {
+		aa, ba := a.As4(), b.As4()
+		return bytes.Compare(aa[:], ba[:]) < 0
 	}
 
 	// At this point, a and b are both v6 or v6+zone.
@@ -319,7 +323,7 @@ func (ip IP) Less(ip2 IP) bool {
 		return true
 	case 1:
 		return false
-	default: // case 0 (bytes.Compare only returns -1, 1, 0)
+	default: // case 0 (bytes.Compare only returns -1, 1, or 0)
 		return a.Zone() < b.Zone()
 	}
 }

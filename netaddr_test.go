@@ -444,6 +444,9 @@ func TestLess(t *testing.T) {
 		{mustIP("::1"), mustIP("::1%foo"), true},
 		{mustIP("::1%foo"), mustIP("::2"), true},
 		{mustIP("::2"), mustIP("::3"), true},
+
+		{mustIP("::"), mustIP("0.0.0.0"), false},
+		{mustIP("0.0.0.0"), mustIP("::"), true},
 	}
 	for _, tt := range tests {
 		got := tt.a.Less(tt.b)
