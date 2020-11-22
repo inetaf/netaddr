@@ -11,7 +11,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"log"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -45,7 +47,7 @@ type ipImpl interface {
 	is4() bool
 	is6() bool
 	is4in6() bool
-	as16() [16]byte
+	as16() ip16
 	// prefix is the type-specific implementation of IP.Prefix.
 	prefix(uint8) (IPPrefix, error)
 	String() string
@@ -56,8 +58,8 @@ type v4Addr [4]byte
 func (v4Addr) is4() bool    { return true }
 func (v4Addr) is6() bool    { return false }
 func (v4Addr) is4in6() bool { return false }
-func (ip v4Addr) as16() [16]byte {
-	return [16]byte{
+func (ip v4Addr) as16() ip16 {
+	return ip16{
 		10: 0xff,
 		11: 0xff,
 		12: ip[0],
@@ -92,10 +94,10 @@ const (
 
 type v6Addr [16]byte
 
-func (v6Addr) is4() bool         { return false }
-func (v6Addr) is6() bool         { return true }
-func (ip v6Addr) is4in6() bool   { return string(ip[:len(mapped4Prefix)]) == mapped4Prefix }
-func (ip v6Addr) as16() [16]byte { return ip }
+func (v6Addr) is4() bool       { return false }
+func (v6Addr) is6() bool       { return true }
+func (ip v6Addr) is4in6() bool { return string(ip[:len(mapped4Prefix)]) == mapped4Prefix }
+func (ip v6Addr) as16() ip16   { return ip16(ip) }
 func (ip v6Addr) prefix(bits uint8) (IPPrefix, error) {
 	if bits > 128 {
 		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
@@ -288,35 +290,47 @@ func (ip IP) Zone() string {
 	return ""
 }
 
-// Less reports whether ip sorts before ip2.
-// IP addresses sort first by length, then their address.
-// IPv6 addresses with zones sort just after the same address without a zone.
-func (ip IP) Less(ip2 IP) bool {
+// Compare returns an integer comparing two IPs.
+// The result will be 0 if ip==ip2, -1 if ip < ip2, and +1 if ip > ip2.
+// The definition of "less than" is the same as the IP.Less method.
+func (ip IP) Compare(ip2 IP) int {
 	a, b := ip, ip2
 	// Zero value sorts first.
 	if a.ipImpl == nil {
-		return b.ipImpl != nil
+		if b.ipImpl == nil {
+			return 0
+		}
+		return -1
 	}
 	if b.ipImpl == nil {
-		return false
+		return 1
 	}
 
 	a4, b4 := a.Is4(), b.Is4()
 	if a4 != b4 {
-		// When address families differ, IPv4 sorts first.
-		return a4
+		if a4 {
+			return -1
+		}
+		return 1
 	}
 
 	aa, ba := a.As16(), b.As16()
-	switch bytes.Compare(aa[:], ba[:]) {
-	case -1:
-		return true
-	case 1:
-		return false
-	default: // case 0 (bytes.Compare only returns -1, 1, or 0)
-		return !a4 && a.Zone() < b.Zone()
+	c := bytes.Compare(aa[:], ba[:])
+	if c == 0 && !a4 {
+		za, zb := a.Zone(), b.Zone()
+		if za < zb {
+			c = -1
+		} else if za > zb {
+			c = 1
+		}
 	}
+	return c
 }
+
+// Less reports whether ip sorts before ip2.
+// IP addresses sort first by length, then their address.
+// IPv6 addresses with zones sort just after the same address without a zone.
+func (ip IP) Less(ip2 IP) bool { return ip.Compare(ip2) == -1 }
 
 // ipZone returns the standard library net.IP from ip, as well
 // as the zone.
@@ -715,6 +729,17 @@ func (p IPPrefix) Masked() IPPrefix {
 	return IPPrefix{}
 }
 
+// Range returns the inclusive range of IPs that p covers.
+//
+// If p is zero or otherwise invalid, Range returns the zero value.
+func (p IPPrefix) Range() IPRange {
+	p = p.Masked()
+	if p.IsZero() {
+		return IPRange{}
+	}
+	return IPRange{From: p.IP, To: p.LastIP()}
+}
+
 // IPNet returns the net.IPNet representation of an IPPrefix.
 // The returned value is always non-nil.
 // Any zone identifier is dropped in the conversion.
@@ -845,4 +870,423 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 // Strings returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
 	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
+}
+
+// LastIP returns the last IP in the prefix.
+func (p IPPrefix) LastIP() IP {
+	if p.IP.IsZero() {
+		return IP{}
+	}
+	a16 := p.IP.As16()
+	var off uint8
+	var bits uint8 = 128
+	if p.IP.Is4() {
+		off = 12
+		bits = 32
+	}
+	for b := p.Bits; b < bits; b++ {
+		byteNum, bitInByte := b/8, 7-(b%8)
+		a16[off+byteNum] |= 1 << uint(bitInByte)
+	}
+	if p.IP.Is4() {
+		return IPFrom16(a16)
+	} else {
+		return IPv6Raw(a16) // doesn't unmap
+	}
+}
+
+// IPRange represents an inclusive range of IP addresses
+// from the same address family.
+type IPRange struct {
+	// From is the starting IP address in the range.
+	// It must have the same address family (IPv4 vs IPv6) as To
+	// and be less than or equal to To.
+	// From is an inclusive bound; it is included in the set.
+	From IP
+
+	// To is the ending IP address in the range.
+	// It must have the same address family (IPv4 vs IPv6) as From
+	// and be greater than or equal to From.
+	// To is an inclusive bound; it is included in the set.
+	To IP
+}
+
+// Valid reports whether r.From and r.To are both non-zero and obey
+// the documented requirements: address families match, and From is
+// less than or equal to To.
+func (r IPRange) Valid() bool {
+	return !r.From.IsZero() && !r.To.IsZero() &&
+		r.From.Is4() == r.To.Is4() &&
+		!r.To.Less(r.From)
+}
+
+// ip16 represents a mutable IP address, either IPv4 (in IPv6-mapped
+// form) or IPv6.
+type ip16 [16]byte
+
+// bitSet reports whether the given bit in the address is set.
+// (bit 0 is the most significant bit in ip[0]; bit 127 is last)
+func (ip ip16) bitSet(bit uint8) bool {
+	i, s := bit/8, 7-(bit%8)
+	return ip[i]&(1<<s) != 0
+}
+
+func (ip *ip16) set(bit uint8) {
+	i, s := bit/8, 7-(bit%8)
+	ip[i] |= 1 << s
+}
+
+func (ip *ip16) clear(bit uint8) {
+	i, s := bit/8, 7-(bit%8)
+	ip[i] &^= 1 << s
+}
+
+// lastWithBitZero returns a copy of ip with the given bit
+// cleared and the following all set.
+func (ip ip16) lastWithBitZero(bit uint8) ip16 {
+	ip.clear(bit)
+	for ; bit < 128; bit++ {
+		ip.set(bit)
+	}
+	return ip
+}
+
+// firstWithBitOne returns a copy of ip with the given bit
+// set and the following all cleared.
+func (ip ip16) firstWithBitOne(bit uint8) ip16 {
+	ip.set(bit)
+	for ; bit < 128; bit++ {
+		ip.clear(bit)
+	}
+	return ip
+}
+
+// prefixMaker returns a address-family-corrected IPPrefix from ip16 and bits,
+// where the input bits is always in the IPv6-mapped form for IPv4 addresses.
+type prefixMaker func(ip16 ip16, bits uint8) IPPrefix
+
+// Prefixes returns the set of IPPrefix entries that covers r.
+//
+// If either of r's bounds are invalid, in the wrong order, or if
+// they're of different address families, then Prefixes returns nil.
+func (r IPRange) Prefixes() []IPPrefix {
+	if !r.Valid() {
+		return nil
+	}
+	var makePrefix prefixMaker
+	if r.From.Is4() {
+		makePrefix = func(ip16 ip16, bits uint8) IPPrefix {
+			return IPPrefix{IPFrom16([16]byte(ip16)), bits - 12*8}
+		}
+	} else {
+		makePrefix = func(ip16 ip16, bits uint8) IPPrefix {
+			return IPPrefix{IPv6Raw([16]byte(ip16)), bits}
+		}
+	}
+	a16, b16 := ip16(r.From.As16()), ip16(r.To.As16())
+	return appendRangePrefixes(nil, makePrefix, a16, b16)
+}
+
+func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a16, b16 ip16) []IPPrefix {
+	common := uint8(0)
+	for common < 128 && a16.bitSet(common) == b16.bitSet(common) {
+		common++
+	}
+	// See whether a16 and b16, after their common shared bits, end
+	// in all zero bits or all one bits, respectively.
+	aAllZero, bAllSet := true, true
+	for i := common; i < 128; i++ {
+		if a16.bitSet(i) {
+			aAllZero = false
+			break
+		}
+	}
+	for i := common; i < 128; i++ {
+		if !b16.bitSet(i) {
+			bAllSet = false
+			break
+		}
+	}
+	if aAllZero && bAllSet {
+		// a16 to b16 represents a whole range, like 10.50.0.0/16.
+		// (a16 being 10.50.0.0 and b16 being 10.50.255.255)
+		return append(dst, makePrefix(a16, common))
+	}
+	// Otherwise recursively do both halves.
+	dst = appendRangePrefixes(dst, makePrefix, a16, a16.lastWithBitZero(common+1))
+	dst = appendRangePrefixes(dst, makePrefix, b16.firstWithBitOne(common+1), b16)
+	return dst
+}
+
+func addOne(a []byte, i int) bool {
+	if v := a[i]; v < 0xff {
+		a[i]++
+		return true
+	}
+	if i == 0 {
+		return false
+	}
+	a[i] = 0
+	return addOne(a, i-1)
+}
+
+func subOne(a []byte, i int) bool {
+	if v := a[i]; v > 0 {
+		a[i]--
+		return true
+	}
+	if i == 0 {
+		return false
+	}
+	a[i] = 0xff
+	return subOne(a, i-1)
+}
+
+// ipFrom16Match returns an IP address from a with address family
+// matching ip.
+func ipFrom16Match(ip IP, a [16]byte) IP {
+	if ip.Is6() {
+		return IPv6Raw(a) // doesn't unwrap
+	}
+	return IPFrom16(a)
+}
+
+// Next returns the IP following ip.
+// If there is none, it returns the IP zero value.
+func (ip IP) Next() IP {
+	var ok bool
+	a := ip.As16()
+	if ip.Is4() {
+		ok = addOne(a[12:], 3)
+	} else {
+		ok = addOne(a[:], 15)
+	}
+	if ok {
+		return ipFrom16Match(ip, a)
+	}
+	return IP{}
+}
+
+// Prior returns the IP before ip.
+// If there is none, it returns the IP zero value.
+func (ip IP) Prior() IP {
+	var ok bool
+	a := ip.As16()
+	if ip.Is4() {
+		ok = subOne(a[12:], 3)
+	} else {
+		ok = subOne(a[:], 15)
+	}
+	if ok {
+		return ipFrom16Match(ip, a)
+	}
+	return IP{}
+}
+
+// IPRangeSet represents a set of IPRanges.
+//
+// The zero value is a valid value representing a set of no IP ranges.
+//
+// The Add and Remove methods add or remove ranges to the set.  Add
+// methods should be called first, as a remove operation does nothing
+// on an empty set. Ranges may be fully, partially, or not
+// overlapping.
+type IPRangeSet struct {
+	// in are the ranges in the set.
+	in []IPRange
+
+	// out are the ranges to be removed from 'in'.
+	out []IPRange
+}
+
+// AddPrefix adds p's range to s.
+func (s *IPRangeSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
+
+// AddRange adds r to s.
+func (s *IPRangeSet) AddRange(r IPRange) {
+	if !r.Valid() {
+		return
+	}
+	// If there are any removals (s.out), then we need to compact the set
+	// first to get the order right.
+	if len(s.out) > 0 {
+		s.in = s.Ranges()
+		s.out = nil
+	}
+	s.in = append(s.in, r)
+}
+
+// RemovePrefix removes p's range from s.
+func (s *IPRangeSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
+
+// RemoveRange removes r from s.
+func (s *IPRangeSet) RemoveRange(r IPRange) {
+	if r.Valid() {
+		s.out = append(s.out, r)
+	}
+}
+
+// AddSet adds all ranges in b to s.
+func (s *IPRangeSet) AddSet(b *IPRangeSet) {
+	for _, r := range b.Ranges() {
+		s.AddRange(r)
+	}
+}
+
+// RemoveSet removes all ranges in b from s.
+func (s *IPRangeSet) RemoveSet(b *IPRangeSet) {
+	for _, r := range b.Ranges() {
+		s.RemoveRange(r)
+	}
+}
+
+// point is either the start or end of IP range of wanted or unwanted
+// IPs.
+type point struct {
+	ip    IP
+	want  bool // true for 'add', false for remove
+	start bool // true for start of range, false for (inclusive) end
+}
+
+func debugLogPoints(points []point) {
+	for _, p := range points {
+		emo := "✅"
+		if !p.want {
+			emo = "❌"
+		}
+		if p.start {
+			log.Printf(" {  %-15s %s\n", p.ip, emo)
+		} else {
+			log.Printf("  } %-15s %s\n", p.ip, emo)
+		}
+	}
+}
+
+// Ranges removes the minimum and sorted set of IP
+// ranges that covers s.
+func (s *IPRangeSet) Ranges() []IPRange {
+	var points []point
+	for _, r := range s.in {
+		points = append(points, point{r.From, true, true}, point{r.To, true, false})
+	}
+	for _, r := range s.out {
+		points = append(points, point{r.From, false, true}, point{r.To, false, false})
+	}
+	sort.Slice(points, func(i, j int) bool {
+		pi, pj := &points[i], &points[j]
+		cmp := pi.ip.Compare(pj.ip)
+		if cmp != 0 {
+			return cmp < 0
+		}
+		if pi.want != pj.want {
+			// Unwanted first.
+			return !pi.want
+		}
+		if pi.start != pj.start {
+			return pi.start
+		}
+		return false
+	})
+	const debug = false
+	if debug {
+		log.Printf("post-sort:")
+		debugLogPoints(points)
+		log.Printf("merging...")
+	}
+
+	// Now build 'want', like points but with "remove" ranges removed
+	// and adjancent blocks merged, and all elements alternating between
+	// start and end.
+	want := points[:0]
+	var addDepth, removeDepth int
+	for i, p := range points {
+		depth := &addDepth
+		if !p.want {
+			depth = &removeDepth
+		}
+		if p.start {
+			*depth++
+		} else {
+			*depth--
+		}
+		if debug {
+			log.Printf("at[%d] (%+v), add=%v, remove=%v", i, p, addDepth, removeDepth)
+		}
+		if p.start && *depth != 1 {
+			continue
+		}
+		if !p.start && *depth != 0 {
+			continue
+		}
+		if !p.want && addDepth > 0 {
+			if p.start {
+				// If we're transitioning from a range of
+				// addresses we want to ones we don't, insert
+				// an end marker for the IP before the one we
+				// don't.
+				want = append(want, point{
+					ip:    p.ip.Prior(),
+					want:  true,
+					start: false,
+				})
+			} else {
+				want = append(want, point{
+					ip:    p.ip.Next(),
+					want:  true,
+					start: true,
+				})
+			}
+		}
+		if !p.want || removeDepth > 0 {
+			continue
+		}
+		// Merge adjacent ranges. Remove prior and skip this
+		// start.
+		if p.start && len(want) > 0 {
+			prior := &want[len(want)-1]
+			if !prior.start && prior.ip == p.ip.Prior() {
+				want = want[:len(want)-1]
+				continue
+			}
+		}
+		want = append(want, p)
+	}
+	if debug {
+		log.Printf("post-merge:")
+		debugLogPoints(want)
+	}
+
+	if len(want)%2 == 1 {
+		panic("internal error; odd number")
+	}
+
+	out := make([]IPRange, 0, len(want)/2)
+	for i := 0; i < len(want); i += 2 {
+		if !want[i].want {
+			panic("internal error; non-want in range")
+		}
+		if !want[i].start {
+			panic("internal error; odd not start")
+		}
+		if want[i+1].start {
+			panic("internal error; even not end")
+		}
+		out = append(out, IPRange{
+			From: want[i].ip,
+			To:   want[i+1].ip,
+		})
+	}
+	return out
+}
+
+// Prefixes returns the minimum and sorted set of IP prefixes
+// that covers s.
+// returning a new slice of prefixes that covers all of the given 'add'
+// prefixes with all the 'remove' prefixes removed.
+func (s *IPRangeSet) Prefixes() []IPPrefix {
+	var out []IPPrefix
+	for _, r := range s.Ranges() {
+		out = append(out, r.Prefixes()...)
+	}
+	return out
 }
