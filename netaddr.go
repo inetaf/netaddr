@@ -307,24 +307,14 @@ func (ip IP) Less(ip2 IP) bool {
 		return a4
 	}
 
-	// At this point, a and b are both either v4 or v6.
-
-	// Both IPv4.
-	if a4 {
-		aa, ba := a.As4(), b.As4()
-		return bytes.Compare(aa[:], ba[:]) < 0
-	}
-
-	// At this point, a and b are both v6 or v6+zone.
-	a16 := a.ipImpl.as16()
-	b16 := b.ipImpl.as16()
-	switch bytes.Compare(a16[:], b16[:]) {
+	aa, ba := a.As16(), b.As16()
+	switch bytes.Compare(aa[:], ba[:]) {
 	case -1:
 		return true
 	case 1:
 		return false
 	default: // case 0 (bytes.Compare only returns -1, 1, or 0)
-		return a.Zone() < b.Zone()
+		return !a4 && a.Zone() < b.Zone()
 	}
 }
 
