@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style
 // license that can be found in the LICENSE file.
 
-// Package netaddr contains an IP address type.
+// Package netaddr contains a IP address type that's in many ways
+// better than the Go standard library's net.IP type. Building on that
+// IP type, the package also contains IPPrefix, IPPort, IPRange, and
+// IPRangeSet types.
 //
-// This is a work in progress. See https://github.com/inetaf/netaddr for background.
+// Notably, this package's IP type takes less memory, is immutable,
+// comparable (supports == and being a map key), and more. See
+// https://github.com/inetaf/netaddr for background.
 package netaddr // import "inet.af/netaddr"
 
 import (
@@ -651,7 +656,7 @@ func (p IPPort) TCPAddr() *net.TCPAddr {
 	}
 }
 
-// IPPrefix is an IP address prefix representing an IP network.
+// IPPrefix is an IP address prefix (CIDR) representing an IP network.
 //
 // The first Bits of IP are specified, the remaining bits match any address.
 // The range of Bits is [0,32] for IPv4 or [0,128] for IPv6.
