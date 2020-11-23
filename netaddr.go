@@ -1297,7 +1297,7 @@ func (s *IPRangeSet) Prefixes() []IPPrefix {
 }
 
 // ContainsFunc returns a func that reports whether an IP is in s.
-// The returned func opertes on a copy of s, so s may be mutated
+// The returned func operates on a copy of s, so s may be mutated
 // later.
 func (s *IPRangeSet) ContainsFunc() (contains func(IP) bool) {
 	rv := s.Ranges()
