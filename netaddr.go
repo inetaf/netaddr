@@ -902,17 +902,18 @@ func (p IPPrefix) LastIP() IP {
 
 // IPRange represents an inclusive range of IP addresses
 // from the same address family.
+//
+// The From and To IPs are inclusive bounds, both included in the
+// range.
+//
+// To be valid, the From and To values be non-zero, have matching
+// address families (IPv4 vs IPv6), and From must be less than or
+// equal to To. An invalid range may be ignored.
 type IPRange struct {
-	// From is the starting IP address in the range.
-	// It must have the same address family (IPv4 vs IPv6) as To
-	// and be less than or equal to To.
-	// From is an inclusive bound; it is included in the set.
+	// From is the initial IP address in the range.
 	From IP
 
-	// To is the ending IP address in the range.
-	// It must have the same address family (IPv4 vs IPv6) as From
-	// and be greater than or equal to From.
-	// To is an inclusive bound; it is included in the set.
+	// To is the final IP address in the range.
 	To IP
 }
 
@@ -1167,7 +1168,7 @@ func debugLogPoints(points []point) {
 	}
 }
 
-// Ranges removes the minimum and sorted set of IP
+// Ranges returns the minimum and sorted set of IP
 // ranges that covers s.
 func (s *IPRangeSet) Ranges() []IPRange {
 	var points []point
