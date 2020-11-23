@@ -427,7 +427,7 @@ func TestIPWellKnown(t *testing.T) {
 	}
 }
 
-func TestLess(t *testing.T) {
+func TestLessCompare(t *testing.T) {
 	tests := []struct {
 		a, b IP
 		want bool
@@ -447,11 +447,28 @@ func TestLess(t *testing.T) {
 
 		{mustIP("::"), mustIP("0.0.0.0"), false},
 		{mustIP("0.0.0.0"), mustIP("::"), true},
+
+		{mustIP("::1%a"), mustIP("::1%b"), true},
+		{mustIP("::1%a"), mustIP("::1%a"), false},
+		{mustIP("::1%b"), mustIP("::1%a"), false},
 	}
 	for _, tt := range tests {
 		got := tt.a.Less(tt.b)
 		if got != tt.want {
 			t.Errorf("Less(%q, %q) = %v; want %v", tt.a, tt.b, got, tt.want)
+		}
+		cmp := tt.a.Compare(tt.b)
+		if got && cmp != -1 {
+			t.Errorf("Less(%q, %q) = true, but Compare = %v (not -1)", tt.a, tt.b, cmp)
+		}
+		if cmp < -1 || cmp > 1 {
+			t.Errorf("bogus Compare return value %v", cmp)
+		}
+		if cmp == 0 && tt.a != tt.b {
+			t.Errorf("Compare(%q, %q) = 0; but not equal", tt.a, tt.b)
+		}
+		if cmp == 1 && !tt.b.Less(tt.a) {
+			t.Errorf("Compare(%q, %q) = 1; but b.Less(a) isn't true", tt.a, tt.b)
 		}
 
 		// Also check inverse.
@@ -1327,6 +1344,26 @@ func TestAs4(t *testing.T) {
 	}
 }
 
+func TestIPPrefixLastIP(t *testing.T) {
+	tests := []struct {
+		prefix, want string
+	}{
+		{"10.0.0.0/8", "10.255.255.255"},
+		{"10.0.0.0/9", "10.127.255.255"},
+		{"0.0.0.0/0", "255.255.255.255"},
+		{"0.0.0.0/32", "0.0.0.0"},
+		{"::/0", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"},
+		{"::/128", "::"},
+	}
+	for _, tt := range tests {
+		p := mustIPPrefix(tt.prefix)
+		got := p.LastIP()
+		if got != mustIP(tt.want) {
+			t.Errorf("LastIP(%v) = %v; want %v", tt.prefix, got, tt.want)
+		}
+	}
+}
+
 func TestIPPrefixOverlaps(t *testing.T) {
 	pfx := mustIPPrefix
 	tests := []struct {
@@ -1365,6 +1402,302 @@ func TestIPPrefixOverlaps(t *testing.T) {
 	for i, tt := range tests {
 		if got := tt.a.Overlaps(tt.b); got != tt.want {
 			t.Errorf("%d. (%v).Overlaps(%v) = %v; want %v", i, tt.a, tt.b, got, tt.want)
+		}
+	}
+}
+
+func pxv(cidrStrs ...string) (out []IPPrefix) {
+	for _, s := range cidrStrs {
+		out = append(out, mustIPPrefix(s))
+	}
+	return
+}
+
+func TestIPRangeSet(t *testing.T) {
+	tests := []struct {
+		name         string
+		f            func(s *IPRangeSet)
+		wantRanges   []IPRange
+		wantPrefixes []IPPrefix // non-nil to test
+	}{
+		{
+			name: "mix_family",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.AddPrefix(mustIPPrefix("::/0"))
+				s.RemovePrefix(mustIPPrefix("10.2.0.0/16"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.1.255.255")},
+				{mustIP("10.3.0.0"), mustIP("10.255.255.255")},
+				{mustIP("::"), mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")},
+			},
+		},
+		{
+			name: "merge_adjacent",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.AddPrefix(mustIPPrefix("11.0.0.0/8"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("11.255.255.255")},
+			},
+			wantPrefixes: pxv("10.0.0.0/7"),
+		},
+		{
+			name: "remove_32",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.1.2.2")},
+				{mustIP("10.1.2.4"), mustIP("10.255.255.255")},
+			},
+			wantPrefixes: pxv(
+				"10.0.0.0/16",
+				"10.1.0.0/23",
+				"10.1.2.0/31",
+				"10.1.2.2/32",
+				"10.1.2.4/30",
+				"10.1.2.8/29",
+				"10.1.2.16/28",
+				"10.1.2.32/27",
+				"10.1.2.64/26",
+				"10.1.2.128/25",
+				"10.1.3.0/24",
+				"10.1.4.0/22",
+				"10.1.8.0/21",
+				"10.1.16.0/20",
+				"10.1.32.0/19",
+				"10.1.64.0/18",
+				"10.1.128.0/17",
+				"10.2.0.0/15",
+				"10.4.0.0/14",
+				"10.8.0.0/13",
+				"10.16.0.0/12",
+				"10.32.0.0/11",
+				"10.64.0.0/10",
+				"10.128.0.0/9",
+			),
+		},
+		{
+			name: "remove_32_and_first_16",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
+				s.RemovePrefix(mustIPPrefix("10.0.0.0/16"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.1.0.0"), mustIP("10.1.2.2")},
+				{mustIP("10.1.2.4"), mustIP("10.255.255.255")},
+			},
+			wantPrefixes: pxv(
+				"10.1.0.0/23",
+				"10.1.2.0/31",
+				"10.1.2.2/32",
+				"10.1.2.4/30",
+				"10.1.2.8/29",
+				"10.1.2.16/28",
+				"10.1.2.32/27",
+				"10.1.2.64/26",
+				"10.1.2.128/25",
+				"10.1.3.0/24",
+				"10.1.4.0/22",
+				"10.1.8.0/21",
+				"10.1.16.0/20",
+				"10.1.32.0/19",
+				"10.1.64.0/18",
+				"10.1.128.0/17",
+				"10.2.0.0/15",
+				"10.4.0.0/14",
+				"10.8.0.0/13",
+				"10.16.0.0/12",
+				"10.32.0.0/11",
+				"10.64.0.0/10",
+				"10.128.0.0/9",
+			),
+		},
+		{
+			name: "add_dup",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
+			},
+		},
+		{
+			name: "add_dup_subet",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.AddPrefix(mustIPPrefix("10.0.0.0/16"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
+			},
+		},
+		{
+			name: "add_remove_add",
+			f: func(s *IPRangeSet) {
+				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
+				s.AddPrefix(mustIPPrefix("10.1.0.0/16")) // undoes prior line
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
+			},
+		},
+		{
+			name: "remove_then_add",
+			f: func(s *IPRangeSet) {
+				s.RemovePrefix(mustIPPrefix("1.2.3.4/32")) // no-op
+				s.AddPrefix(mustIPPrefix("1.2.3.4/32"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("1.2.3.4"), mustIP("1.2.3.4")},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var s IPRangeSet
+			tt.f(&s)
+			got := s.Ranges()
+			t.Run("ranges", func(t *testing.T) {
+				if reflect.DeepEqual(got, tt.wantRanges) {
+					return
+				}
+				t.Error("failed. got:\n")
+				for _, v := range got {
+					t.Errorf("  %s -> %s", v.From, v.To)
+				}
+				t.Error("want:\n")
+				for _, v := range tt.wantRanges {
+					t.Errorf("  %s -> %s", v.From, v.To)
+				}
+			})
+			if tt.wantPrefixes != nil {
+				t.Run("prefixes", func(t *testing.T) {
+					got := s.Prefixes()
+					if got == nil {
+						got = []IPPrefix{}
+					}
+					if reflect.DeepEqual(got, tt.wantPrefixes) {
+						return
+					}
+					t.Error("failed. got:\n")
+					for _, v := range got {
+						t.Errorf("  %v", v)
+					}
+					t.Error("want:\n")
+					for _, v := range tt.wantPrefixes {
+						t.Errorf("  %v", v)
+					}
+				})
+			}
+		})
+	}
+}
+
+func TestRangePrefixes(t *testing.T) {
+	tests := []struct {
+		from string
+		to   string
+		want []IPPrefix
+	}{
+		{"0.0.0.0", "255.255.255.255", pxv("0.0.0.0/0")},
+		{"::", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff", pxv("::/0")},
+		{"10.0.0.0", "10.255.255.255", pxv("10.0.0.0/8")},
+		{"10.0.0.0", "10.127.255.255", pxv("10.0.0.0/9")},
+		{"0.0.0.4", "0.0.0.11", pxv(
+			// 4 0100
+			// 5 0101
+			// 6 0110
+			// 7 0111
+			// 8 1000
+			// 9 1001
+			//10 1010
+			//11 1011
+			"0.0.0.4/30",
+			"0.0.0.8/30",
+		)},
+		{"10.0.0.0", "11.10.255.255", pxv(
+			"10.0.0.0/8",
+			"11.0.0.0/13",
+			"11.8.0.0/15",
+			"11.10.0.0/16",
+		)},
+		{"1.2.3.5", "5.6.7.8", pxv(
+			"1.2.3.5/32",
+			"1.2.3.6/31",
+			"1.2.3.8/29",
+			"1.2.3.16/28",
+			"1.2.3.32/27",
+			"1.2.3.64/26",
+			"1.2.3.128/25",
+			"1.2.4.0/22",
+			"1.2.8.0/21",
+			"1.2.16.0/20",
+			"1.2.32.0/19",
+			"1.2.64.0/18",
+			"1.2.128.0/17",
+			"1.3.0.0/16",
+			"1.4.0.0/14",
+			"1.8.0.0/13",
+			"1.16.0.0/12",
+			"1.32.0.0/11",
+			"1.64.0.0/10",
+			"1.128.0.0/9",
+			"2.0.0.0/7",
+			"4.0.0.0/8",
+			"5.0.0.0/14",
+			"5.4.0.0/15",
+			"5.6.0.0/22",
+			"5.6.4.0/23",
+			"5.6.6.0/24",
+			"5.6.7.0/29",
+			"5.6.7.8/32",
+		)},
+	}
+	for _, tt := range tests {
+		r := IPRange{From: mustIP(tt.from), To: mustIP(tt.to)}
+		got := r.Prefixes()
+		if !reflect.DeepEqual(got, tt.want) {
+			t.Errorf("failed %s->%s. got:", tt.from, tt.to)
+			for _, v := range got {
+				t.Errorf("  %v", v)
+			}
+			t.Error("want:\n")
+			for _, v := range tt.want {
+				t.Errorf("  %v", v)
+			}
+		}
+	}
+}
+
+func TestIPNextPrior(t *testing.T) {
+	tests := []struct {
+		ip    IP
+		next  IP
+		prior IP
+	}{
+		{mustIP("10.0.0.1"), mustIP("10.0.0.2"), mustIP("10.0.0.0")},
+		{mustIP("10.0.0.255"), mustIP("10.0.1.0"), mustIP("10.0.0.254")},
+		{mustIP("254.255.255.255"), mustIP("255.0.0.0"), mustIP("254.255.255.254")},
+		{mustIP("255.255.255.255"), IP{}, mustIP("255.255.255.254")},
+		{mustIP("0.0.0.0"), mustIP("0.0.0.1"), IP{}},
+		{mustIP("::"), mustIP("::1"), IP{}},
+		{mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), IP{}, mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")},
+	}
+	for _, tt := range tests {
+		gnext, gprior := tt.ip.Next(), tt.ip.Prior()
+		if gnext != tt.next {
+			t.Errorf("IP(%v).Next = %v; want %v", tt.ip, gnext, tt.next)
+		}
+		if gprior != tt.prior {
+			t.Errorf("IP(%v).Prior = %v; want %v", tt.ip, gprior, tt.prior)
 		}
 	}
 }
