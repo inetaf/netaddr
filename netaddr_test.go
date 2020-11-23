@@ -7,8 +7,11 @@
 package netaddr
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math/rand"
 	"net"
 	"reflect"
 	"sort"
@@ -1418,7 +1421,8 @@ func TestIPSet(t *testing.T) {
 		name         string
 		f            func(s *IPSet)
 		wantRanges   []IPRange
-		wantPrefixes []IPPrefix // non-nil to test
+		wantPrefixes []IPPrefix      // non-nil to test
+		wantContains map[string]bool // optional non-exhaustive IPs to test for in resulting set
 	}{
 		{
 			name: "mix_family",
@@ -1559,9 +1563,44 @@ func TestIPSet(t *testing.T) {
 				{mustIP("1.2.3.4"), mustIP("1.2.3.4")},
 			},
 		},
+		{
+			name: "remove_end_on_add_start",
+			f: func(s *IPSet) {
+				s.AddRange(IPRange{mustIP("0.0.0.38"), mustIP("0.0.0.177")})
+				s.RemoveRange(IPRange{mustIP("0.0.0.18"), mustIP("0.0.0.38")})
+			},
+			wantRanges: []IPRange{
+				{mustIP("0.0.0.39"), mustIP("0.0.0.177")},
+			},
+		},
+		{
+			name: "fuzz_fail_2",
+			f: func(s *IPSet) {
+				s.AddRange(IPRange{mustIP("0.0.0.143"), mustIP("0.0.0.185")})
+				s.AddRange(IPRange{mustIP("0.0.0.84"), mustIP("0.0.0.174")})
+				s.AddRange(IPRange{mustIP("0.0.0.51"), mustIP("0.0.0.61")})
+				s.RemoveRange(IPRange{mustIP("0.0.0.66"), mustIP("0.0.0.146")})
+				s.AddRange(IPRange{mustIP("0.0.0.22"), mustIP("0.0.0.207")})
+				s.RemoveRange(IPRange{mustIP("0.0.0.198"), mustIP("0.0.0.203")})
+				s.RemoveRange(IPRange{mustIP("0.0.0.23"), mustIP("0.0.0.69")})
+				s.AddRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.105")})
+				s.AddRange(IPRange{mustIP("0.0.0.151"), mustIP("0.0.0.203")})
+				s.AddRange(IPRange{mustIP("0.0.0.138"), mustIP("0.0.0.160")})
+				s.RemoveRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.161")})
+			},
+			wantRanges: []IPRange{
+				{mustIP("0.0.0.22"), mustIP("0.0.0.22")},
+				{mustIP("0.0.0.162"), mustIP("0.0.0.207")},
+			},
+			wantContains: map[string]bool{
+				"0.0.0.22": true,
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			debugf = t.Logf
+			defer func() { debugf = discardf }()
 			var s IPSet
 			tt.f(&s)
 			got := s.Ranges()
@@ -1596,6 +1635,15 @@ func TestIPSet(t *testing.T) {
 						t.Errorf("  %v", v)
 					}
 				})
+			}
+			if len(tt.wantContains) > 0 {
+				contains := s.ContainsFunc()
+				for s, want := range tt.wantContains {
+					got := contains(mustIP(s))
+					if got != want {
+						t.Errorf("Contains(%q) = %v; want %v", s, got, want)
+					}
+				}
 			}
 		})
 	}
@@ -1738,4 +1786,168 @@ func TestIPSetContainsFunc(t *testing.T) {
 			t.Errorf("contains(%q) = %v; want %v", tt.ip, got, tt.want)
 		}
 	}
+}
+
+func TestIPSetFuzz(t *testing.T) {
+	if testing.Short() {
+		doIPSetFuzz(t, 100)
+	} else {
+		doIPSetFuzz(t, 5000)
+	}
+}
+
+func BenchmarkIPSetFuzz(b *testing.B) {
+	b.ReportAllocs()
+	doIPSetFuzz(b, b.N)
+}
+
+func doIPSetFuzz(t testing.TB, iters int) {
+	var buf bytes.Buffer
+	logger := log.New(&buf, "", 0)
+	debugf = logger.Printf
+	defer func() { debugf = discardf }()
+	for i := 0; i < iters; i++ {
+		buf.Reset()
+		steps, set, wantContains := newRandomIPSet()
+		contains := set.ContainsFunc()
+		for b, want := range wantContains {
+			ip := IPv4(0, 0, 0, uint8(b))
+			got := contains(ip)
+			if got != want {
+				t.Fatalf("for steps %q, contains(%v) = %v; want %v\n%s", steps, ip, got, want, buf.Bytes())
+			}
+		}
+	}
+}
+
+func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
+	s = new(IPSet)
+	nstep := 2 + rand.Intn(10)
+	for i := 0; i < nstep; i++ {
+		op := rand.Intn(2)
+		ip1 := uint8(rand.Intn(256))
+		ip2 := uint8(rand.Intn(256))
+		if ip2 < ip1 {
+			ip1, ip2 = ip2, ip1
+		}
+		var v bool
+		switch op {
+		case 0:
+			steps = append(steps, fmt.Sprintf("add 0.0.0.%d-0.0.0.%d", ip1, ip2))
+			s.AddRange(IPRange{From: IPv4(0, 0, 0, ip1), To: IPv4(0, 0, 0, ip2)})
+			v = true
+		case 1:
+			steps = append(steps, fmt.Sprintf("remove 0.0.0.%d-0.0.0.%d", ip1, ip2))
+			s.RemoveRange(IPRange{From: IPv4(0, 0, 0, ip1), To: IPv4(0, 0, 0, ip2)})
+		}
+		for i := ip1; i <= ip2; i++ {
+			wantContains[i] = v
+			if i == ip2 {
+				break
+			}
+		}
+	}
+	return
+
+}
+
+func TestPointLess(t *testing.T) {
+	tests := []struct {
+		a, b point
+		want bool
+	}{
+		// IPs sort first.
+		{
+			point{ip: mustIP("1.2.3.4"), want: false, start: true},
+			point{ip: mustIP("1.2.3.5"), want: false, start: true},
+			true,
+		},
+
+		// Starts.
+		{
+			point{ip: mustIP("1.1.1.1"), want: false, start: true},
+			point{ip: mustIP("1.1.1.1"), want: true, start: true},
+			true,
+		},
+		{
+			point{ip: mustIP("2.2.2.2"), want: true, start: true},
+			point{ip: mustIP("2.2.2.2"), want: false, start: true},
+			false,
+		},
+
+		// Ends.
+		{
+			point{ip: mustIP("3.3.3.3"), want: true, start: false},
+			point{ip: mustIP("3.3.3.3"), want: false, start: false},
+			false,
+		},
+		{
+			point{ip: mustIP("4.4.4.4"), want: false, start: false},
+			point{ip: mustIP("4.4.4.4"), want: true, start: false},
+			true,
+		},
+
+		// End & start at same IP.
+		{
+			point{ip: mustIP("5.5.5.5"), want: true, start: true},
+			point{ip: mustIP("5.5.5.5"), want: true, start: false},
+			true,
+		},
+		{
+			point{ip: mustIP("6.6.6.6"), want: true, start: false},
+			point{ip: mustIP("6.6.6.6"), want: true, start: true},
+			false,
+		},
+
+		// For same IP & both start, unwanted comes first.
+		{
+			point{ip: mustIP("7.7.7.7"), want: false, start: true},
+			point{ip: mustIP("7.7.7.7"), want: true, start: true},
+			true,
+		},
+		{
+			point{ip: mustIP("8.8.8.8"), want: true, start: true},
+			point{ip: mustIP("8.8.8.8"), want: false, start: true},
+			false,
+		},
+
+		// And not-want-end should come after a do-want-start.
+		{
+			point{ip: mustIP("10.0.0.30"), want: false, start: false},
+			point{ip: mustIP("10.0.0.30"), want: true, start: true},
+			false,
+		},
+		{
+			point{ip: mustIP("10.0.0.40"), want: true, start: true},
+			point{ip: mustIP("10.0.0.40"), want: false, start: false},
+			true,
+		},
+
+		// A not-want start should come before a not-want want.
+		{
+			point{ip: mustIP("10.0.0.9"), want: false, start: true},
+			point{ip: mustIP("10.0.0.9"), want: false, start: false},
+			true,
+		},
+		{
+			point{ip: mustIP("10.0.0.9"), want: false, start: false},
+			point{ip: mustIP("10.0.0.9"), want: false, start: true},
+			false,
+		},
+	}
+	for _, tt := range tests {
+		got := tt.a.Less(tt.b)
+		if got != tt.want {
+			t.Errorf("Less(%+v, %+v) = %v; want %v", tt.a, tt.b, got, tt.want)
+			continue
+		}
+		got2 := tt.b.Less(tt.a)
+		if got && got2 {
+			t.Errorf("Less(%+v, %+v) = properly true; but is also true in reverse", tt.a, tt.b)
+		}
+		if !got && !got2 && tt.a != tt.b {
+			t.Errorf("Less(%+v, %+v) both false but unequal", tt.a, tt.b)
+		}
+	}
+
 }

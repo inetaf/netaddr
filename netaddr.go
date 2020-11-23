@@ -16,7 +16,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"sort"
 	"strconv"
@@ -1154,6 +1153,30 @@ type point struct {
 	start bool // true for start of range, false for (inclusive) end
 }
 
+// Less sorts points by the needs of the IPSet.Ranges function.
+// See also comments in netaddr_test.go's TestPointLess.
+func (a point) Less(b point) bool {
+	cmp := a.ip.Compare(b.ip)
+	if cmp != 0 {
+		return cmp < 0
+	}
+	if a.want != b.want {
+		if a.start == b.start {
+			return !a.want
+		}
+		return a.start
+	}
+	if a.start != b.start {
+		return a.start
+	}
+	return false
+}
+
+func discardf(format string, args ...interface{}) {}
+
+// debugf is reassigned by tests.
+var debugf = discardf
+
 func debugLogPoints(points []point) {
 	for _, p := range points {
 		emo := "✅"
@@ -1161,9 +1184,9 @@ func debugLogPoints(points []point) {
 			emo = "❌"
 		}
 		if p.start {
-			log.Printf(" {  %-15s %s\n", p.ip, emo)
+			debugf(" {  %-15s %s\n", p.ip, emo)
 		} else {
-			log.Printf("  } %-15s %s\n", p.ip, emo)
+			debugf("  } %-15s %s\n", p.ip, emo)
 		}
 	}
 }
@@ -1178,26 +1201,12 @@ func (s *IPSet) Ranges() []IPRange {
 	for _, r := range s.out {
 		points = append(points, point{r.From, false, true}, point{r.To, false, false})
 	}
-	sort.Slice(points, func(i, j int) bool {
-		pi, pj := &points[i], &points[j]
-		cmp := pi.ip.Compare(pj.ip)
-		if cmp != 0 {
-			return cmp < 0
-		}
-		if pi.want != pj.want {
-			// Unwanted first.
-			return !pi.want
-		}
-		if pi.start != pj.start {
-			return pi.start
-		}
-		return false
-	})
+	sort.Slice(points, func(i, j int) bool { return points[i].Less(points[j]) })
 	const debug = false
 	if debug {
-		log.Printf("post-sort:")
+		debugf("post-sort:")
 		debugLogPoints(points)
-		log.Printf("merging...")
+		debugf("merging...")
 	}
 
 	// Now build 'want', like points but with "remove" ranges removed
@@ -1216,7 +1225,7 @@ func (s *IPSet) Ranges() []IPRange {
 			*depth--
 		}
 		if debug {
-			log.Printf("at[%d] (%+v), add=%v, remove=%v", i, p, addDepth, removeDepth)
+			debugf("at[%d] (%+v), add=%v, remove=%v", i, p, addDepth, removeDepth)
 		}
 		if p.start && *depth != 1 {
 			continue
@@ -1258,7 +1267,7 @@ func (s *IPSet) Ranges() []IPRange {
 		want = append(want, p)
 	}
 	if debug {
-		log.Printf("post-merge:")
+		debugf("post-merge:")
 		debugLogPoints(want)
 	}
 
