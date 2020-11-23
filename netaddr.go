@@ -5,7 +5,7 @@
 // Package netaddr contains a IP address type that's in many ways
 // better than the Go standard library's net.IP type. Building on that
 // IP type, the package also contains IPPrefix, IPPort, IPRange, and
-// IPRangeSet types.
+// IPSet types.
 //
 // Notably, this package's IP type takes less memory, is immutable,
 // comparable (supports == and being a map key), and more. See
@@ -1089,7 +1089,7 @@ func (ip IP) Prior() IP {
 	return IP{}
 }
 
-// IPRangeSet represents a set of IPRanges.
+// IPSet represents a set of IPRanges.
 //
 // The zero value is a valid value representing a set of no IP ranges.
 //
@@ -1097,7 +1097,7 @@ func (ip IP) Prior() IP {
 // methods should be called first, as a remove operation does nothing
 // on an empty set. Ranges may be fully, partially, or not
 // overlapping.
-type IPRangeSet struct {
+type IPSet struct {
 	// in are the ranges in the set.
 	in []IPRange
 
@@ -1106,10 +1106,10 @@ type IPRangeSet struct {
 }
 
 // AddPrefix adds p's range to s.
-func (s *IPRangeSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
+func (s *IPSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
 
 // AddRange adds r to s.
-func (s *IPRangeSet) AddRange(r IPRange) {
+func (s *IPSet) AddRange(r IPRange) {
 	if !r.Valid() {
 		return
 	}
@@ -1123,24 +1123,24 @@ func (s *IPRangeSet) AddRange(r IPRange) {
 }
 
 // RemovePrefix removes p's range from s.
-func (s *IPRangeSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
+func (s *IPSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
 
 // RemoveRange removes r from s.
-func (s *IPRangeSet) RemoveRange(r IPRange) {
+func (s *IPSet) RemoveRange(r IPRange) {
 	if r.Valid() {
 		s.out = append(s.out, r)
 	}
 }
 
 // AddSet adds all ranges in b to s.
-func (s *IPRangeSet) AddSet(b *IPRangeSet) {
+func (s *IPSet) AddSet(b *IPSet) {
 	for _, r := range b.Ranges() {
 		s.AddRange(r)
 	}
 }
 
 // RemoveSet removes all ranges in b from s.
-func (s *IPRangeSet) RemoveSet(b *IPRangeSet) {
+func (s *IPSet) RemoveSet(b *IPSet) {
 	for _, r := range b.Ranges() {
 		s.RemoveRange(r)
 	}
@@ -1170,7 +1170,7 @@ func debugLogPoints(points []point) {
 
 // Ranges returns the minimum and sorted set of IP
 // ranges that covers s.
-func (s *IPRangeSet) Ranges() []IPRange {
+func (s *IPSet) Ranges() []IPRange {
 	var points []point
 	for _, r := range s.in {
 		points = append(points, point{r.From, true, true}, point{r.To, true, false})
@@ -1289,7 +1289,7 @@ func (s *IPRangeSet) Ranges() []IPRange {
 // that covers s.
 // returning a new slice of prefixes that covers all of the given 'add'
 // prefixes with all the 'remove' prefixes removed.
-func (s *IPRangeSet) Prefixes() []IPPrefix {
+func (s *IPSet) Prefixes() []IPPrefix {
 	var out []IPPrefix
 	for _, r := range s.Ranges() {
 		out = append(out, r.Prefixes()...)
@@ -1300,7 +1300,7 @@ func (s *IPRangeSet) Prefixes() []IPPrefix {
 // ContainsFunc returns a func that reports whether an IP is in s.
 // The returned func operates on a copy of s, so s may be mutated
 // later.
-func (s *IPRangeSet) ContainsFunc() (contains func(IP) bool) {
+func (s *IPSet) ContainsFunc() (contains func(IP) bool) {
 	rv := s.Ranges()
 	// TODO(bradfitz): build a faster data structure with
 	// with s.Prefixes()?

@@ -10,8 +10,8 @@ import (
 	"inet.af/netaddr"
 )
 
-func ExampleIPRangeSet() {
-	var s netaddr.IPRangeSet
+func ExampleIPSet() {
+	var s netaddr.IPSet
 
 	p, _ := netaddr.ParseIPPrefix("10.0.0.0/8")
 	s.AddPrefix(p)

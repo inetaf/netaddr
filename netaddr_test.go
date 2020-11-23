@@ -1413,16 +1413,16 @@ func pxv(cidrStrs ...string) (out []IPPrefix) {
 	return
 }
 
-func TestIPRangeSet(t *testing.T) {
+func TestIPSet(t *testing.T) {
 	tests := []struct {
 		name         string
-		f            func(s *IPRangeSet)
+		f            func(s *IPSet)
 		wantRanges   []IPRange
 		wantPrefixes []IPPrefix // non-nil to test
 	}{
 		{
 			name: "mix_family",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.AddPrefix(mustIPPrefix("::/0"))
 				s.RemovePrefix(mustIPPrefix("10.2.0.0/16"))
@@ -1435,7 +1435,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "merge_adjacent",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.AddPrefix(mustIPPrefix("11.0.0.0/8"))
 			},
@@ -1446,7 +1446,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "remove_32",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
 			},
@@ -1483,7 +1483,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "remove_32_and_first_16",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
 				s.RemovePrefix(mustIPPrefix("10.0.0.0/16"))
@@ -1520,7 +1520,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "add_dup",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 			},
@@ -1530,7 +1530,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "add_dup_subet",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.AddPrefix(mustIPPrefix("10.0.0.0/16"))
 			},
@@ -1540,7 +1540,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "add_remove_add",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
 				s.AddPrefix(mustIPPrefix("10.1.0.0/16")) // undoes prior line
@@ -1551,7 +1551,7 @@ func TestIPRangeSet(t *testing.T) {
 		},
 		{
 			name: "remove_then_add",
-			f: func(s *IPRangeSet) {
+			f: func(s *IPSet) {
 				s.RemovePrefix(mustIPPrefix("1.2.3.4/32")) // no-op
 				s.AddPrefix(mustIPPrefix("1.2.3.4/32"))
 			},
@@ -1562,7 +1562,7 @@ func TestIPRangeSet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var s IPRangeSet
+			var s IPSet
 			tt.f(&s)
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
@@ -1702,8 +1702,8 @@ func TestIPNextPrior(t *testing.T) {
 	}
 }
 
-func TestIPRangeSetContainsFunc(t *testing.T) {
-	var s IPRangeSet
+func TestIPSetContainsFunc(t *testing.T) {
+	var s IPSet
 	s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 	s.AddPrefix(mustIPPrefix("1.2.3.4/32"))
 	s.AddPrefix(mustIPPrefix("fc00::/7"))
