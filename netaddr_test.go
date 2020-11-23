@@ -1357,7 +1357,7 @@ func TestIPPrefixLastIP(t *testing.T) {
 	}
 	for _, tt := range tests {
 		p := mustIPPrefix(tt.prefix)
-		got := p.LastIP()
+		got := p.lastIP()
 		if got != mustIP(tt.want) {
 			t.Errorf("LastIP(%v) = %v; want %v", tt.prefix, got, tt.want)
 		}

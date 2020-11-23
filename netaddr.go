@@ -742,7 +742,7 @@ func (p IPPrefix) Range() IPRange {
 	if p.IsZero() {
 		return IPRange{}
 	}
-	return IPRange{From: p.IP, To: p.LastIP()}
+	return IPRange{From: p.IP, To: p.lastIP()}
 }
 
 // IPNet returns the net.IPNet representation of an IPPrefix.
@@ -877,8 +877,8 @@ func (p IPPrefix) String() string {
 	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
 }
 
-// LastIP returns the last IP in the prefix.
-func (p IPPrefix) LastIP() IP {
+// lastIP returns the last IP in the prefix.
+func (p IPPrefix) lastIP() IP {
 	if p.IP.IsZero() {
 		return IP{}
 	}
