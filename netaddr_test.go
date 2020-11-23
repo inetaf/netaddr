@@ -1701,3 +1701,41 @@ func TestIPNextPrior(t *testing.T) {
 		}
 	}
 }
+
+func TestIPRangeSetContainsFunc(t *testing.T) {
+	var s IPRangeSet
+	s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+	s.AddPrefix(mustIPPrefix("1.2.3.4/32"))
+	s.AddPrefix(mustIPPrefix("fc00::/7"))
+	contains := s.ContainsFunc()
+
+	tests := []struct {
+		ip   string
+		want bool
+	}{
+		{"0.0.0.0", false},
+		{"::", false},
+
+		{"1.2.3.3", false},
+		{"1.2.3.4", true},
+		{"1.2.3.5", false},
+
+		{"9.255.255.255", false},
+		{"10.0.0.0", true},
+		{"10.1.2.3", true},
+		{"10.255.255.255", true},
+		{"11.0.0.0", false},
+
+		{"::", false},
+		{"fc00::", true},
+		{"fc00::1", true},
+		{"fd00::1", true},
+		{"ff00::1", false},
+	}
+	for _, tt := range tests {
+		got := contains(mustIP(tt.ip))
+		if got != tt.want {
+			t.Errorf("contains(%q) = %v; want %v", tt.ip, got, tt.want)
+		}
+	}
+}
