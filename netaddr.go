@@ -1089,13 +1089,13 @@ func (ip IP) Prior() IP {
 	return IP{}
 }
 
-// IPSet represents a set of IPRanges.
+// IPSet represents a set of IP addresses.
 //
-// The zero value is a valid value representing a set of no IP ranges.
+// The zero value is a valid value representing a set of no IPs.
 //
-// The Add and Remove methods add or remove ranges to the set.  Add
-// methods should be called first, as a remove operation does nothing
-// on an empty set. Ranges may be fully, partially, or not
+// The Add and Remove methods add or remove IPs to/from the set.
+// Add methods should be called first, as a remove operation does
+// nothing on an empty set. Ranges may be fully, partially, or not
 // overlapping.
 type IPSet struct {
 	// in are the ranges in the set.
