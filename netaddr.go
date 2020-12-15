@@ -282,9 +282,25 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 	return IP{}, false
 }
 
-// IsZero reports whether ip is its zero value. The IP zero value is
-// not a valid IP address of any type.
+// IsZero reports whether ip is the zero value of the IP type.
+// The zero value is not a valid IP address of any type.
+//
+// Note that "0.0.0.0" and "::" are not the zero value.
 func (ip IP) IsZero() bool { return ip == IP{} }
+
+// BitLen returns the number of bits in the IP address:
+// 32 for IPv4 or 128 for IPv6.
+// For the zero value (see IP.IsZero), it returns 0.
+// For IP4-mapped IPv6 addresses, it returns 128.
+func (ip IP) BitLen() uint8 {
+	if ip.IsZero() {
+		return 0
+	}
+	if ip.ipImpl.is4() {
+		return 32
+	}
+	return 128
+}
 
 // Zone returns ip's IPv6 scoped addressing zone, if any.
 func (ip IP) Zone() string {

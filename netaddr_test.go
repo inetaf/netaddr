@@ -1750,6 +1750,26 @@ func TestIPNextPrior(t *testing.T) {
 	}
 }
 
+func TestIPBitLen(t *testing.T) {
+	tests := []struct {
+		ip   IP
+		want uint8
+	}{
+		{IP{}, 0},
+		{mustIP("0.0.0.0"), 32},
+		{mustIP("10.0.0.1"), 32},
+		{mustIP("::"), 128},
+		{mustIP("fed0::1"), 128},
+		{mustIP("::ffff:10.0.0.1"), 128},
+	}
+	for _, tt := range tests {
+		got := tt.ip.BitLen()
+		if got != tt.want {
+			t.Errorf("BitLen(%v) = %d; want %d", tt.ip, got, tt.want)
+		}
+	}
+}
+
 func TestIPSetContainsFunc(t *testing.T) {
 	var s IPSet
 	s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
