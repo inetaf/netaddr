@@ -27,6 +27,7 @@ func TestParseString(t *testing.T) {
 		"::1",
 		"fe80::1cc0:3e8c:119f:c2e1%ens18",
 		"::ffff:c000:1234",
+		"::ffff:f077:ff",
 	}
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
@@ -208,19 +209,19 @@ func TestIPFrom16AndIPv6Raw(t *testing.T) {
 			name: "v6-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{15: 1},
-			want: IP{v6Addr{15: 1}},
+			want: IP{z: z6noz, a: [16]byte{15: 1}},
 		},
 		{
 			name: "v6-from16",
 			fn:   IPFrom16,
 			in:   [...]byte{15: 1},
-			want: IP{v6Addr{15: 1}},
+			want: IP{z: z6noz, a: [16]byte{15: 1}},
 		},
 		{
 			name: "v4-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
-			want: IP{v6Addr{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}},
+			want: IP{z: z6noz, a: [16]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}},
 		},
 		{
 			name: "v4-from16",
@@ -1971,4 +1972,29 @@ func TestPointLess(t *testing.T) {
 		}
 	}
 
+}
+
+var sinkIP IP
+var sinkIPPort IPPort
+
+func TestNoAllocs(t *testing.T) {
+	test := func(name string, f func()) {
+		t.Run(name, func(t *testing.T) {
+			n := testing.AllocsPerRun(1000, f)
+			if n != 0 {
+				t.Fatalf("allocs = %d; want 0", int(n))
+			}
+		})
+	}
+	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
+	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
+
+	// TODO: currently 1
+	// test("ParseIP_4", func() { sinkIP, _ = ParseIP("1.2.3.4") })
+
+	// TODO: currently 4
+	// test("ParseIP_6", func() { sinkIP, _ = ParseIP("[::1]") })
+
+	// TODO: currently 1
+	// test("ParseIPPort", func() { sinkIPPort, _ = ParseIPPort("[::1]:1234") })
 }
