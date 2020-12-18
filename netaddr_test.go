@@ -14,6 +14,7 @@ import (
 	"math/rand"
 	"net"
 	"reflect"
+	"runtime"
 	"sort"
 	"strings"
 	"testing"
@@ -1970,4 +1971,18 @@ func TestPointLess(t *testing.T) {
 		}
 	}
 
+}
+
+// TestWeakRefs ensures that unused zones are GC'd.
+func TestWeakRefs(t *testing.T) {
+	// Create a "eth0" zone.
+	mustIP("fe80::1%eth0")
+	// The "eth0" zone has no references. Force a GC so that our finalizers will run.
+	runtime.GC()
+	// Confirm that the finalizers ran.
+	zmu.Lock()
+	defer zmu.Unlock()
+	if len(uniqZone) != 0 {
+		t.Errorf("zone not cleaned up")
+	}
 }

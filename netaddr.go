@@ -17,12 +17,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
 	"sync"
-	"unsafe"
 )
 
 // Simple constants copied to avoid importing math.
@@ -56,24 +54,6 @@ type IP struct {
 	// z6noz means an IPv6 address without a zone.
 	z *zone
 }
-
-// zone is the IPv6 zone and its generation count to prevent the finalizer
-// from deleting weak references from the uniqZone map.
-type zone struct {
-	// name is the IPv6 zone.
-	// It is immutable.
-	name string
-
-	// gen is guarded by zmu and is incremented whenever this zone
-	// is returned.
-	gen int64
-}
-
-var (
-	z0    = (*zone)(nil)
-	z4    = new(zone)
-	z6noz = new(zone)
-)
 
 func v4Prefix(ip [4]byte, bits uint8) (IPPrefix, error) {
 	if bits > 32 {
@@ -338,12 +318,6 @@ func (ip IP) Unmap() IP {
 	return ip
 }
 
-// zmu guards uniqZone, a weakref map of *zones by zoneName.
-var (
-	zmu      sync.Mutex
-	uniqZone = map[string]uintptr{} // zone name to its uintptr(*zone)
-)
-
 // WithZone returns an IP that's the same as ip but with the provided
 // zone. If zoneName is empty, the zone is removed. If ip is an IPv4
 // address it's returned unchanged.
@@ -355,37 +329,7 @@ func (ip IP) WithZone(zoneName string) IP {
 		ip.z = z6noz
 		return ip
 	}
-
-	zmu.Lock()
-	defer zmu.Unlock()
-
-	addr, ok := uniqZone[zoneName]
-	var z *zone
-	if ok {
-		z = (*zone)((unsafe.Pointer)(addr))
-	} else {
-		z = &zone{name: zoneName}
-		uniqZone[zoneName] = uintptr(unsafe.Pointer(z))
-	}
-	curGen := z.gen + 1
-	z.gen = curGen
-
-	if curGen > 1 {
-		// Need to clear it before changing it,
-		// else the runtime throws.
-		runtime.SetFinalizer(z, nil)
-	}
-	runtime.SetFinalizer(z, func(z *zone) {
-		zmu.Lock()
-		defer zmu.Unlock()
-		if z.gen != curGen {
-			// Lost the race. Somebody is still using us.
-			return
-		}
-		delete(uniqZone, z.name)
-	})
-
-	ip.z = z
+	ip.z = internZone(zoneName)
 	return ip
 }
 
