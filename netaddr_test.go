@@ -27,6 +27,7 @@ func TestParseString(t *testing.T) {
 		"::1",
 		"fe80::1cc0:3e8c:119f:c2e1%ens18",
 		"::ffff:c000:1234",
+		"::ffff:127.6.0.0%0",
 	}
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
@@ -46,6 +47,18 @@ func TestParseString(t *testing.T) {
 				t.Errorf("String = %q; want %q", back, s)
 			}
 		})
+	}
+}
+
+func TestParseIPBad(t *testing.T) {
+	tests := []string{
+		"127.6.0.0%0",
+	}
+	for _, test := range tests {
+		ip, err := ParseIP(test)
+		if err == nil {
+			t.Errorf("ParseIP(%q) should return error, parsed as %v", test, ip)
+		}
 	}
 }
 

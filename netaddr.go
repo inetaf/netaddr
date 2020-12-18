@@ -219,6 +219,9 @@ func ParseIP(s string) (IP, error) {
 			if ipa.IP == nil {
 				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): unable to parse IP", s)
 			}
+			if !strings.Contains(s, ":") {
+				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): cannot use scoped addressing zone with IPv4", s)
+			}
 		}
 	}
 
