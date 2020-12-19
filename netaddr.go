@@ -431,7 +431,7 @@ func (ip IP) String() string {
 	}
 	if ip.Is4in6() {
 		a4 := ip.As4()
-		return fmt.Sprintf("::ffff:%x%02d:%x%02x", a4[0], a4[1], a4[2], a4[3])
+		return fmt.Sprintf("::ffff:%x:%x", uint16(a4[0])<<8|uint16(a4[1]), uint16(a4[2])<<8|uint16(a4[3]))
 	}
 	return (&net.IPAddr{IP: net.IP(ip.a[:]), Zone: ip.Zone()}).String()
 }

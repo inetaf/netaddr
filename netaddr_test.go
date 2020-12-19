@@ -28,6 +28,7 @@ func TestParseString(t *testing.T) {
 		"::1",
 		"fe80::1cc0:3e8c:119f:c2e1%ens18",
 		"::ffff:c000:1234",
+		"::ffff:f077:ff",
 	}
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
