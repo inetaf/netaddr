@@ -44,7 +44,7 @@ const o4 = len(mapped4Prefix)
 //
 // Unlike net.IP or net.IPAddr, the netaddr.IP is a comparable value
 // type (it supports == and can be a map key) and is immutable.
-// Its memory representation is 24 bytes in 64-bit machines (the same
+// Its memory representation is 24 bytes on 64-bit machines (the same
 // size as a Go slice header) for both IPv4 and IPv6 address.
 type IP struct {
 	a [16]byte // IPv6 or IPv4-mapped IPv6 form of IPv4 addr
