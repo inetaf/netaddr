@@ -25,6 +25,7 @@ func TestParseString(t *testing.T) {
 		"0.0.0.0",
 		"::",
 		"::1",
+		"::1%zone",
 		"fe80::1cc0:3e8c:119f:c2e1%ens18",
 		"::ffff:c000:1234",
 		"::ffff:f077:ff",
@@ -47,6 +48,13 @@ func TestParseString(t *testing.T) {
 				t.Errorf("String = %q; want %q", back, s)
 			}
 		})
+	}
+}
+
+func TestParseIPv4Zone(t *testing.T) {
+	ip, err := ParseIP("1.2.3.4%zone")
+	if err == nil {
+		t.Fatalf("expected error parsing v4 w/ zone; got %v", ip)
 	}
 }
 

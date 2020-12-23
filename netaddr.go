@@ -181,6 +181,9 @@ func ParseIP(s string) (IP, error) {
 
 	if !strings.Contains(s, ":") {
 		if ip4 := ipa.IP.To4(); ip4 != nil {
+			if ipa.Zone != "" {
+				return IP{}, fmt.Errorf("netaddr.ParseIP(%q): invalid zone with IPv4 address", s)
+			}
 			return IPv4(ip4[0], ip4[1], ip4[2], ip4[3]), nil
 		}
 	}
