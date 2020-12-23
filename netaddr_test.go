@@ -1988,9 +1988,7 @@ func TestNoAllocs(t *testing.T) {
 	}
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
 	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
-
-	// TODO: currently 1
-	// test("ParseIP_4", func() { sinkIP, _ = ParseIP("1.2.3.4") })
+	test("ParseIP_4", func() { sinkIP, _ = ParseIP("1.2.3.4") })
 
 	// TODO: currently 4
 	// test("ParseIP_6", func() { sinkIP, _ = ParseIP("[::1]") })
