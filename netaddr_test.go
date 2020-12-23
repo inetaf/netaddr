@@ -50,6 +50,38 @@ func TestParseString(t *testing.T) {
 	}
 }
 
+func TestParseIPMatchesStd(t *testing.T) {
+	tests := []string{
+		"1.2.3.4",
+		"0.0.0.0",
+		"::",
+		"::1",
+		"000000192.0000168.00000.00001", // https://play.golang.org/p/06oxvudU5DT
+		"::ff:1.2.3.4",
+		"ab:cd::1.2.3.4", // 1.2.3.4 syntax with non-4in6 prefix
+	}
+	for _, s := range tests {
+		t.Run(s, func(t *testing.T) {
+			ip, err := ParseIP(s)
+			if err != nil {
+				t.Fatalf("our ParseIP: %v", err)
+			}
+			stdIP := net.ParseIP(s)
+			if stdIP == nil {
+				t.Fatalf("std ParseIP: %v", err)
+			}
+			ipBack, ok := FromStdIP(stdIP)
+			if !ok {
+				t.Fatalf("didn't map back")
+			}
+			if ipBack != ip {
+				t.Fatalf("our parse %v != (std parse %v => back as %v)",
+					ip, stdIP, ipBack)
+			}
+		})
+	}
+}
+
 func TestIPMarshalUnmarshal(t *testing.T) {
 	tests := []string{
 		"",
