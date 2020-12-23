@@ -52,11 +52,13 @@ func TestParseString(t *testing.T) {
 
 func TestParseIPMatchesStd(t *testing.T) {
 	tests := []string{
+		"bad",
 		"1.2.3.4",
 		"0.0.0.0",
 		"::",
 		"::1",
 		"000000192.0000168.00000.00001", // https://play.golang.org/p/06oxvudU5DT
+		"::ffff:1.2.3.4",
 		"::ff:1.2.3.4",
 		"ab:cd::1.2.3.4", // 1.2.3.4 syntax with non-4in6 prefix
 	}
@@ -64,6 +66,10 @@ func TestParseIPMatchesStd(t *testing.T) {
 		t.Run(s, func(t *testing.T) {
 			ip, err := ParseIP(s)
 			if err != nil {
+				if net.ParseIP(s) == nil {
+					// Both failed to parse, so they match. Good.
+					return
+				}
 				t.Fatalf("our ParseIP: %v", err)
 			}
 			stdIP := net.ParseIP(s)
@@ -74,10 +80,17 @@ func TestParseIPMatchesStd(t *testing.T) {
 			if !ok {
 				t.Fatalf("didn't map back")
 			}
-			if ipBack != ip {
-				t.Fatalf("our parse %v != (std parse %v => back as %v)",
-					ip, stdIP, ipBack)
+			if ipBack == ip {
+				// Match.
+				return
 			}
+			if ip.Is4in6() {
+				// Don't expect a match.
+				t.Logf("expected difference; we got %v; std can't distinguish 4-in-6 and got %v", ip, stdIP)
+				return
+			}
+			t.Fatalf("our parse %v != (std parse %v => back as %v)",
+				ip, stdIP, ipBack)
 		})
 	}
 }
