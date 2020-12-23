@@ -482,8 +482,12 @@ func (ip IP) String() string {
 		return fmt.Sprintf("%d.%d.%d.%d", ip.a[o4+0], ip.a[o4+1], ip.a[o4+2], ip.a[o4+3])
 	}
 	if ip.Is4in6() {
-		a4 := ip.As4()
-		return fmt.Sprintf("::ffff:%x:%x", uint16(a4[0])<<8|uint16(a4[1]), uint16(a4[2])<<8|uint16(a4[3]))
+		a4, zone := ip.As4(), ip.Zone()
+		var percent string
+		if zone != "" {
+			percent = "%"
+		}
+		return fmt.Sprintf("::ffff:%x:%x%s%s", uint16(a4[0])<<8|uint16(a4[1]), uint16(a4[2])<<8|uint16(a4[3]), percent, zone)
 	}
 	return (&net.IPAddr{IP: net.IP(ip.a[:]), Zone: ip.Zone()}).String()
 }
