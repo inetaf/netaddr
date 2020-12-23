@@ -151,6 +151,11 @@ func IPFrom16(addr [16]byte) IP {
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").
 func ParseIP(s string) (IP, error) {
+	// IPv4 fast path.
+	if ip, ok := parseIPv4(s); ok {
+		return ip, nil
+	}
+
 	var ipa net.IPAddr
 	ipa.IP = net.ParseIP(s)
 	if ipa.IP == nil {
@@ -182,6 +187,32 @@ func ParseIP(s string) (IP, error) {
 	var a16 [16]byte
 	copy(a16[:], ipa.IP.To16())
 	return IPv6Raw(a16).WithZone(ipa.Zone), nil
+}
+
+// parseIPv4 parses s as an IPv4 address (in form "192.168.0.1") and
+// reports whether it parsed as such. This is a fast path for ParseIP
+// for now. It ultimately falls back to the standard library's
+// net.ParseIP at the moment, so returning ok=false from here just
+// means it'll try it a slower way.
+func parseIPv4(s string) (ip IP, ok bool) {
+	if len(s) < 7 || len(s) > 15 || strings.Count(s, ".") != 3 {
+		return ip, false
+	}
+	var v [4]uint64
+	for i := range v {
+		var numStr string
+		if dot := strings.IndexByte(s, '.'); dot == -1 {
+			numStr = s
+		} else {
+			numStr, s = s[:dot], s[dot+1:]
+		}
+		var err error
+		v[i], err = strconv.ParseUint(numStr, 10, 8)
+		if err != nil {
+			return ip, false
+		}
+	}
+	return IPv4(uint8(v[0]), uint8(v[1]), uint8(v[2]), uint8(v[3])), true
 }
 
 // FromStdIP returns an IP from the standard library's IP type.
