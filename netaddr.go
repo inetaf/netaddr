@@ -192,6 +192,16 @@ func ParseIP(s string) (IP, error) {
 	return IPv6Raw(a16).WithZone(ipa.Zone), nil
 }
 
+// MustParseIP calls ParseIP(s) and panics on error.
+// It is intended for use in tests with hard-coded strings.
+func MustParseIP(s string) IP {
+	ip, err := ParseIP(s)
+	if err != nil {
+		panic(err)
+	}
+	return ip
+}
+
 // parseIPv4 parses s as an IPv4 address (in form "192.168.0.1") and
 // reports whether it parsed as such. This is a fast path for ParseIP
 // for now. It ultimately falls back to the standard library's
@@ -546,6 +556,16 @@ func ParseIPPort(s string) (IPPort, error) {
 	return ipp, nil
 }
 
+// MustParseIPPort calls ParseIPPort(s) and panics on error.
+// It is intended for use in tests with hard-coded strings.
+func MustParseIPPort(s string) IPPort {
+	ip, err := ParseIPPort(s)
+	if err != nil {
+		panic(err)
+	}
+	return ip
+}
+
 // IsZero reports whether p is its zero value.
 func (p IPPort) IsZero() bool { return p == IPPort{} }
 
@@ -678,6 +698,16 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 		IP:   ip,
 		Bits: uint8(bits),
 	}, nil
+}
+
+// MustParseIPPrefix calls ParseIPPrefix(s) and panics on error.
+// It is intended for use in tests with hard-coded strings.
+func MustParseIPPrefix(s string) IPPrefix {
+	ip, err := ParseIPPrefix(s)
+	if err != nil {
+		panic(err)
+	}
+	return ip
 }
 
 // Masked returns p in its canonical form, with bits of p.IP not in p.Bits masked off.
