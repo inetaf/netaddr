@@ -1063,6 +1063,27 @@ func TestParseIPPrefixError(t *testing.T) {
 	}
 }
 
+func TestIPPrefixIsSingleIP(t *testing.T) {
+	tests := []struct {
+		ipp  IPPrefix
+		want bool
+	}{
+		{ipp: mustIPPrefix("127.0.0.1/32"), want: true},
+		{ipp: mustIPPrefix("127.0.0.1/31"), want: false},
+		{ipp: mustIPPrefix("127.0.0.1/0"), want: false},
+		{ipp: mustIPPrefix("::1/128"), want: true},
+		{ipp: mustIPPrefix("::1/127"), want: false},
+		{ipp: mustIPPrefix("::1/0"), want: false},
+		{ipp: IPPrefix{}, want: false},
+	}
+	for _, tt := range tests {
+		got := tt.ipp.IsSingleIP()
+		if got != tt.want {
+			t.Errorf("IsSingleIP(%v) = %v want %v", tt.ipp, got, tt.want)
+		}
+	}
+}
+
 func TestParseIPError(t *testing.T) {
 	tests := []struct {
 		ip     string

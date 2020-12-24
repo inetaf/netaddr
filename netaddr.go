@@ -623,6 +623,9 @@ type IPPrefix struct {
 // IsZero reports whether p is its zero value.
 func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
 
+// IsSingleIP reports whether p contains exactly one IP.
+func (p IPPrefix) IsSingleIP() bool { return p.Bits != 0 && p.Bits == p.IP.BitLen() }
+
 // FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
 // If std is invalid, ok is false.
 func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
