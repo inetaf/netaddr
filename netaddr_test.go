@@ -264,19 +264,19 @@ func TestIPFrom16AndIPv6Raw(t *testing.T) {
 			name: "v6-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{15: 1},
-			want: IP{z: z6noz, a: [16]byte{15: 1}},
+			want: IP{z: z6noz, lo: 1},
 		},
 		{
 			name: "v6-from16",
 			fn:   IPFrom16,
 			in:   [...]byte{15: 1},
-			want: IP{z: z6noz, a: [16]byte{15: 1}},
+			want: IP{z: z6noz, lo: 1},
 		},
 		{
 			name: "v4-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
-			want: IP{z: z6noz, a: [16]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}},
+			want: IP{z: z6noz, lo: 0xffff01020304},
 		},
 		{
 			name: "v4-from16",
@@ -1429,7 +1429,7 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 			b.ReportAllocs()
 
 			for i := 0; i < b.N; i++ {
-				tt.ip.Prefix(tt.bits)
+				sinkIPPrefix, _ = tt.ip.Prefix(tt.bits)
 			}
 		})
 	}
@@ -2116,6 +2116,7 @@ func TestPointLess(t *testing.T) {
 
 var sinkIP IP
 var sinkIPPort IPPort
+var sinkIPPrefix IPPrefix
 
 func TestNoAllocs(t *testing.T) {
 	test := func(name string, f func()) {

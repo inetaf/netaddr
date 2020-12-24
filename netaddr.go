@@ -13,7 +13,7 @@
 package netaddr // import "inet.af/netaddr"
 
 import (
-	"bytes"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"net"
@@ -25,14 +25,8 @@ import (
 	"go4.org/intern"
 )
 
-// Simple constants copied to avoid importing math.
-const (
-	maxUint8  = 1<<8 - 1
-	maxUint16 = 1<<16 - 1
-)
-
-// o4 is the offset to the beginning of the IPv4 address within IP.a.
-const o4 = len(mapped4Prefix)
+// copied to avoid importing math.
+const maxUint16 = 1<<16 - 1
 
 // Sizes: (64-bit)
 //   net.IP:     24 byte slice header + {4, 16} = 28 to 40 bytes
@@ -47,7 +41,22 @@ const o4 = len(mapped4Prefix)
 // Its memory representation is 24 bytes on 64-bit machines (the same
 // size as a Go slice header) for both IPv4 and IPv6 address.
 type IP struct {
-	a [16]byte // IPv6 or IPv4-mapped IPv6 form of IPv4 addr
+	// hi and lo are the bits of an IPv6 address. If z==z4, hi and lo
+	// contain the IPv4-mapped IPv6 address.
+	//
+	// hi and lo are constructed by interpreting a 16-byte IPv6
+	// address as a big-endian 128-bit number. The most significant
+	// bits of that number go into hi, the rest into lo.
+	//
+	// For example, 0011:2233:4455:6677:8899:aabb:ccdd:eeff is stored as:
+	//  hi = 0x0011223344556677
+	//  lo = 0x8899aabbccddeeff
+	//
+	// We store IPs like this, rather than as [16]byte, because it
+	// turns most operations on IPs into arithmetic and bit-twiddling
+	// operations on 64-bit registers, which is much faster than
+	// bytewise processing.
+	hi, lo uint64
 
 	// z is a combination of the address family and the IPv6 zone.
 	//
@@ -67,64 +76,18 @@ var (
 	z6noz = new(intern.Value)
 )
 
-func v4Prefix(ip [4]byte, bits uint8) (IPPrefix, error) {
-	if bits > 32 {
-		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
-	}
-	skip, partial := int(bits/8), bits%8
-	if partial != 0 {
-		ip[skip] = ip[skip] & ^byte(0xff>>partial)
-		skip++
-	}
-	for i := skip; i < 4; i++ {
-		ip[i] = 0
-	}
-	return IPPrefix{IPv4(ip[0], ip[1], ip[2], ip[3]), bits}, nil
-}
-
-const (
-	// mapped4Prefix are the 12 leading bytes in a IPv4-mapped IPv6 address.
-	mapped4Prefix = "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\xff\xff"
-)
-
-// v6Loopback is the IPv6 loopback address.
-var v6Loopback = [16]byte{15: 1}
-
-func v6Prefix(ip [16]byte, bits uint8) (IPPrefix, error) {
-	if bits > 128 {
-		return IPPrefix{}, fmt.Errorf("netaddr: prefix length %d too large for IP address family", bits)
-	}
-	skip, partial := int(bits/8), bits%8
-	if partial != 0 {
-		ip[skip] = ip[skip] & ^byte(0xff>>partial)
-		skip++
-	}
-	b := ip[skip:]
-	for i := range b {
-		b[i] = 0
-	}
-	return IPPrefix{IPv6Raw(ip), bits}, nil
-}
-
 // IPv6LinkLocalAllNodes returns the IPv6 link-local all nodes multicast
 // address ff02::1.
 func IPv6LinkLocalAllNodes() IP { return IPv6Raw([16]byte{0: 0xff, 1: 0x02, 15: 0x01}) }
 
 // IPv6Unspecified returns the IPv6 unspecified address ::.
-func IPv6Unspecified() IP { return IPv6Raw([16]byte{}) }
+func IPv6Unspecified() IP { return IP{z: z6noz} }
 
 // IPv4 returns the IP of the IPv4 address a.b.c.d.
 func IPv4(a, b, c, d uint8) IP {
 	return IP{
-		z: z4,
-		a: [16]byte{
-			10:     0xff,
-			11:     0xff,
-			o4 + 0: a,
-			o4 + 1: b,
-			o4 + 2: c,
-			o4 + 3: d,
-		},
+		lo: 0xffff00000000 | uint64(a)<<24 | uint64(b)<<16 | uint64(c)<<8 | uint64(d),
+		z:  z4,
 	}
 }
 
@@ -132,19 +95,29 @@ func IPv4(a, b, c, d uint8) IP {
 // without an implicit Unmap call to unmap any v6-mapped IPv4
 // address.
 func IPv6Raw(addr [16]byte) IP {
-	return IP{a: addr, z: z6noz}
+	return IP{
+		hi: binary.BigEndian.Uint64(addr[:8]),
+		lo: binary.BigEndian.Uint64(addr[8:]),
+		z:  z6noz,
+	}
+}
+
+// ipv6Slice is like IPv6Raw, but operates on a 16-byte slice. Assumes
+// slice is 16 bytes, caller must enforce this.
+func ipv6Slice(addr []byte) IP {
+	return IP{
+		hi: binary.BigEndian.Uint64(addr[:8]),
+		lo: binary.BigEndian.Uint64(addr[8:]),
+		z:  z6noz,
+	}
 }
 
 // IPFrom16 returns the IP address given by the bytes in addr,
 // unmapping any v6-mapped IPv4 address.
 //
-// It is equivalent to calling IPv6Raw(addr).Unmap() but slightly more
-// efficient.
+// It is equivalent to calling IPv6Raw(addr).Unmap().
 func IPFrom16(addr [16]byte) IP {
-	if string(addr[:o4]) == mapped4Prefix {
-		return IPv4(addr[o4+0], addr[o4+1], addr[o4+2], addr[o4+3])
-	}
-	return IPv6Raw(addr)
+	return IPv6Raw(addr).Unmap()
 }
 
 // ParseIP parses s as an IP address, returning the result. The string
@@ -187,9 +160,7 @@ func ParseIP(s string) (IP, error) {
 			return IPv4(ip4[0], ip4[1], ip4[2], ip4[3]), nil
 		}
 	}
-	var a16 [16]byte
-	copy(a16[:], ipa.IP.To16())
-	return IPv6Raw(a16).WithZone(ipa.Zone), nil
+	return ipv6Slice(ipa.IP.To16()).WithZone(ipa.Zone), nil
 }
 
 // MustParseIP calls ParseIP(s) and panics on error.
@@ -239,18 +210,11 @@ func parseIPv4(s string) (ip IP, ok bool) {
 // To convert a standard library IP without the implicit unmapping, use
 // FromStdIPRaw.
 func FromStdIP(std net.IP) (ip IP, ok bool) {
-	if len(std) == 16 && string(std[:o4]) == mapped4Prefix {
-		std = std[o4:]
+	ret, ok := FromStdIPRaw(std)
+	if ret.Is4in6() {
+		ret.z = z4
 	}
-	switch len(std) {
-	case 4:
-		return IPv4(std[0], std[1], std[2], std[3]), true
-	case 16:
-		var a [16]byte
-		copy(a[:], std)
-		return IPFrom16(a), true
-	}
-	return IP{}, false
+	return ret, ok
 }
 
 // FromStdIPRaw returns an IP from the standard library's IP type.
@@ -262,11 +226,25 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 	case 4:
 		return IPv4(std[0], std[1], std[2], std[3]), true
 	case 16:
-		var a [16]byte
-		copy(a[:], std)
-		return IPv6Raw(a), true
+		return ipv6Slice(std), true
 	}
 	return IP{}, false
+}
+
+// v4 returns the i'th byte of ip. If ip is not an IPv4, v4 returns
+// unspecified garbage.
+func (ip IP) v4(i uint8) uint8 {
+	return uint8(ip.lo>>((3-i)*8))
+}
+
+// v6 returns the i'th byte of ip. If ip is an IPv4 address, this
+// accesses the IPv4-mapped IPv6 address form of the IP.
+func (ip IP) v6(i uint8) uint8 {
+	if i >= 8 {
+		return uint8(ip.lo>>((15-i)*8))
+	} else {
+		return uint8(ip.hi>>((7-i)*8))
+	}
 }
 
 // IsZero reports whether ip is the zero value of the IP type.
@@ -309,16 +287,27 @@ func (ip IP) Compare(ip2 IP) int {
 	if f1 > f2 {
 		return 1
 	}
-	c := bytes.Compare(ip.a[:], ip2.a[:])
-	if c == 0 && ip.Is6() {
+	if ip.hi < ip2.hi {
+		return -1
+	}
+	if ip.hi > ip2.hi {
+		return 1
+	}
+	if ip.lo < ip2.lo {
+		return -1
+	}
+	if ip.lo > ip2.lo {
+		return 1
+	}
+	if ip.Is6() {
 		za, zb := ip.Zone(), ip2.Zone()
 		if za < zb {
-			c = -1
+			return -1
 		} else if za > zb {
-			c = 1
+			return 1
 		}
 	}
-	return c
+	return 0
 }
 
 // Less reports whether ip sorts before ip2.
@@ -338,7 +327,8 @@ func (ip IP) ipZone(reuse net.IP) (stdIP net.IP, zone string) {
 		a4 := ip.As4()
 		return append(base, a4[:]...), ""
 	default:
-		return append(base, ip.a[:]...), ip.Zone()
+		a16 := ip.As16()
+		return append(base, a16[:]...), ip.Zone()
 	}
 }
 
@@ -359,7 +349,7 @@ func (ip IP) Is4() bool {
 
 // Is4in6 reports whether ip is an IPv4-mapped IPv6 address.
 func (ip IP) Is4in6() bool {
-	return ip.z != z0 && ip.z != z4 && string(ip.a[:o4]) == mapped4Prefix
+	return ip.Is6() && ip.hi == 0 && ip.lo>>32 == 0xffff
 }
 
 // Is6 reports whether ip is an IPv6 address, including IPv4-mapped
@@ -399,10 +389,10 @@ func (ip IP) WithZone(zone string) IP {
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalUnicast() bool {
 	if ip.Is4() {
-		return ip.a[o4+0] == 169 && ip.a[o4+1] == 254
+		return ip.v4(0) == 169 && ip.v4(1) == 254
 	}
 	if ip.Is6() {
-		return ip.a[0] == 0xfe && ip.a[1] == 0x80
+		return ip.v6(0) == 0xfe && ip.v6(1) == 0x80
 	}
 	return false // zero value
 }
@@ -411,10 +401,10 @@ func (ip IP) IsLinkLocalUnicast() bool {
 // it will return false.
 func (ip IP) IsLoopback() bool {
 	if ip.Is4() {
-		return ip.a[o4+0] == 127
+		return ip.v4(0) == 127
 	}
 	if ip.Is6() {
-		return ip.a == v6Loopback
+		return ip.hi == 0 && ip.lo == 1
 	}
 	return false // zero value
 }
@@ -423,10 +413,10 @@ func (ip IP) IsLoopback() bool {
 // value, it will return false.
 func (ip IP) IsMulticast() bool {
 	if ip.Is4() {
-		return ip.a[o4+0]&0xf0 == 0xe0
+		return ip.v4(0)&0xf0 == 0xe0
 	}
 	if ip.Is6() {
-		return ip.a[0] == 0xff
+		return ip.v6(0) == 0xff
 	}
 	return false // zero value
 }
@@ -436,20 +426,24 @@ func (ip IP) IsMulticast() bool {
 // a nil error are returned. If bits is larger than 32 for an IPv4 address or
 // 128 for an IPv6 address, an error is returned.
 func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
-	if ip.z == z0 {
+	effectiveBits := bits
+	switch ip.z {
+	case z0:
 		return IPPrefix{}, nil
+	case z4:
+		if bits > 32 {
+			return IPPrefix{}, fmt.Errorf("prefix length %d too large for IPv4", bits)
+		}
+		effectiveBits += 96
+	default:
+		if bits > 128 {
+			return IPPrefix{}, fmt.Errorf("prefix length %d too large for IPv6", bits)
+		}
 	}
-	if ip.Is4() {
-		return v4Prefix(ip.As4(), bits)
-	}
-	ipp, err := v6Prefix(ip.a, bits)
-	if err != nil {
-		return IPPrefix{}, err
-	}
-	if z := ip.Zone(); z != "" {
-		ipp.IP = ipp.IP.WithZone(z)
-	}
-	return ipp, nil
+	mhi, mlo := mask6(effectiveBits)
+	ip.hi &= mhi
+	ip.lo &= mlo
+	return IPPrefix{ip, bits}, nil
 }
 
 // As16 returns the IP address in its 16 byte representation.
@@ -458,7 +452,10 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 // Zone method to get it).
 // The ip zero value returns all zeroes.
 func (ip IP) As16() [16]byte {
-	return ip.a
+	var ret [16]byte
+	binary.BigEndian.PutUint64(ret[:8], ip.hi)
+	binary.BigEndian.PutUint64(ret[8:], ip.lo)
+	return ret
 }
 
 // As4 returns an IPv4 or IPv4-in-IPv6 address in its 4 byte representation.
@@ -466,7 +463,9 @@ func (ip IP) As16() [16]byte {
 // Note that 0.0.0.0 is not the zero value.
 func (ip IP) As4() [4]byte {
 	if ip.z == z4 || ip.Is4in6() {
-		return [4]byte{ip.a[o4+0], ip.a[o4+1], ip.a[o4+2], ip.a[o4+3]}
+		var ret [4]byte
+		binary.BigEndian.PutUint32(ret[:], uint32(ip.lo))
+		return ret
 	}
 	if ip.z == z0 {
 		panic("As4 called on IP zero value")
@@ -489,17 +488,18 @@ func (ip IP) String() string {
 		return "invalid IP"
 	}
 	if ip.Is4() {
-		return fmt.Sprintf("%d.%d.%d.%d", ip.a[o4+0], ip.a[o4+1], ip.a[o4+2], ip.a[o4+3])
+		return fmt.Sprintf("%d.%d.%d.%d", ip.v4(0), ip.v4(1), ip.v4(2), ip.v4(3))
 	}
 	if ip.Is4in6() {
-		a4, zone := ip.As4(), ip.Zone()
+		zone := ip.Zone()
 		var percent string
 		if zone != "" {
 			percent = "%"
 		}
-		return fmt.Sprintf("::ffff:%x:%x%s%s", uint16(a4[0])<<8|uint16(a4[1]), uint16(a4[2])<<8|uint16(a4[3]), percent, zone)
+		return fmt.Sprintf("::ffff:%x:%x%s%s", uint16(ip.v4(0))<<8|uint16(ip.v4(1)), uint16(ip.v4(2))<<8|uint16(ip.v4(3)), percent, zone)
 	}
-	return (&net.IPAddr{IP: net.IP(ip.a[:]), Zone: ip.Zone()}).String()
+	a16 := ip.As16()
+	return (&net.IPAddr{IP: net.IP(a16[:]), Zone: ip.Zone()}).String()
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,
@@ -774,40 +774,39 @@ func (p IPPrefix) IPNet() *net.IPNet {
 	}
 }
 
+// mask4 returns a bit mask that selects the topmost n bits of a
+// uint32.
+func mask4(n uint8) uint32 {
+	return ^uint32(0) << (32 - n)
+}
+
+// mask6 returns a bit mask that selects the topmost n bits of a
+// 128-bit number. Due to Go's lack of 128-bit numeric types, the mask
+// is returned as a pair of uint64s, in the same order as the uint64
+// pair in the IP type.
+func mask6(n uint8) (hi, lo uint64) {
+	if n > 64 {
+		return ^uint64(0), ^uint64(0) << (128 - n)
+	} else {
+		return ^uint64(0) << (64 - n), 0
+	}
+}
+
 // Contains reports whether the network p includes addr.
 //
 // An IPv4 address will not match an IPv6 prefix.
 // A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
 func (p IPPrefix) Contains(addr IP) bool {
-	var nn, ip []byte // these do not escape and so do not allocate
 	if f1, f2 := p.IP.BitLen(), addr.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
 		return false
 	}
 	if addr.Is4() {
-		nn = p.IP.a[o4:]
-		ip = addr.a[o4:]
+		return uint32(addr.lo)&mask4(p.Bits) == uint32(p.IP.lo)
 	} else {
-		nn = p.IP.a[:]
-		ip = addr.a[:]
+		mhi, mlo := mask6(p.Bits)
+		return addr.hi&mhi == p.IP.hi && addr.lo&mlo == p.IP.lo
 	}
-	bits := p.Bits
-	for i := 0; bits > 0 && i < len(nn); i++ {
-		m := uint8(maxUint8)
-		if bits < 8 {
-			zeros := 8 - bits
-			m = m >> zeros << zeros
-		}
-		if nn[i]&m != ip[i]&m {
-			return false
-		}
-		// Prevent integer underflow for masks of < /8.
-		if bits < 8 {
-			break
-		}
-		bits -= 8
-	}
-	return true
 }
 
 // Overlaps reports whether p and o overlap at all.
