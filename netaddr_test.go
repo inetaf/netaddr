@@ -30,6 +30,7 @@ func TestParseString(t *testing.T) {
 		"::ffff:c000:1234",
 		"::ffff:f077:ff",
 		"::ffff:c000:1234%zone",
+		"::f:ffff:0:0",
 	}
 	for _, s := range tests {
 		t.Run(s, func(t *testing.T) {
