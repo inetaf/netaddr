@@ -1790,11 +1790,13 @@ func TestIPNextPrior(t *testing.T) {
 	}{
 		{mustIP("10.0.0.1"), mustIP("10.0.0.2"), mustIP("10.0.0.0")},
 		{mustIP("10.0.0.255"), mustIP("10.0.1.0"), mustIP("10.0.0.254")},
+		{mustIP("127.0.0.1"), mustIP("127.0.0.2"), mustIP("127.0.0.0")},
 		{mustIP("254.255.255.255"), mustIP("255.0.0.0"), mustIP("254.255.255.254")},
 		{mustIP("255.255.255.255"), IP{}, mustIP("255.255.255.254")},
 		{mustIP("0.0.0.0"), mustIP("0.0.0.1"), IP{}},
 		{mustIP("::"), mustIP("::1"), IP{}},
 		{mustIP("::%x"), mustIP("::1%x"), IP{}},
+		{mustIP("::1"), mustIP("::2"), mustIP("::")},
 		{mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), IP{}, mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")},
 	}
 	for _, tt := range tests {
@@ -1804,6 +1806,12 @@ func TestIPNextPrior(t *testing.T) {
 		}
 		if gprior != tt.prior {
 			t.Errorf("IP(%v).Prior = %v; want %v", tt.ip, gprior, tt.prior)
+		}
+		if !tt.ip.Next().IsZero() && tt.ip.Next().Prior() != tt.ip {
+			t.Errorf("IP(%v).Next.Prior = %v; want %v", tt.ip, tt.ip.Next().Prior(), tt.ip)
+		}
+		if !tt.ip.Prior().IsZero() && tt.ip.Prior().Next() != tt.ip {
+			t.Errorf("IP(%v).Prior.Next = %v; want %v", tt.ip, tt.ip.Prior().Next(), tt.ip)
 		}
 	}
 }
