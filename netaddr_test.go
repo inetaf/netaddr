@@ -1793,6 +1793,7 @@ func TestIPNextPrior(t *testing.T) {
 		{mustIP("255.255.255.255"), IP{}, mustIP("255.255.255.254")},
 		{mustIP("0.0.0.0"), mustIP("0.0.0.1"), IP{}},
 		{mustIP("::"), mustIP("::1"), IP{}},
+		{mustIP("::%x"), mustIP("::1%x"), IP{}},
 		{mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), IP{}, mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")},
 	}
 	for _, tt := range tests {

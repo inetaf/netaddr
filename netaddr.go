@@ -1004,6 +1004,11 @@ func ipFrom16Match(ip IP, a [16]byte) IP {
 	return IPFrom16(a)
 }
 
+func (ip IP) withInternedZone(z *intern.Value) IP {
+	ip.z = z
+	return ip
+}
+
 // Next returns the IP following ip.
 // If there is none, it returns the IP zero value.
 func (ip IP) Next() IP {
@@ -1015,7 +1020,7 @@ func (ip IP) Next() IP {
 		ok = addOne(a[:], 15)
 	}
 	if ok {
-		return ipFrom16Match(ip, a)
+		return ipFrom16Match(ip, a).withInternedZone(ip.z)
 	}
 	return IP{}
 }
@@ -1031,7 +1036,7 @@ func (ip IP) Prior() IP {
 		ok = subOne(a[:], 15)
 	}
 	if ok {
-		return ipFrom16Match(ip, a)
+		return ipFrom16Match(ip, a).withInternedZone(ip.z)
 	}
 	return IP{}
 }
