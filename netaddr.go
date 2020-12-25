@@ -578,6 +578,32 @@ func (p IPPort) String() string {
 	return net.JoinHostPort(p.IP.String(), strconv.Itoa(int(p.Port)))
 }
 
+// MarshalText implements the encoding.TextMarshaler interface. The
+// encoding is the same as returned by String, with one exception: if
+// p.IP is the zero value, the encoding is the empty string.
+func (p IPPort) MarshalText() ([]byte, error) {
+	if p.IP.z == z0 {
+		return []byte(""), nil
+	}
+	return []byte(p.String()), nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler
+// interface. The IPPort is expected in a form accepted by
+// ParseIPPort. It returns an error if *p is not the IPPort zero
+// value.
+func (p *IPPort) UnmarshalText(text []byte) error {
+	if p.IP.z != z0 || p.Port != 0 {
+		return errors.New("netaddr: refusing to UnmarshalText into non-zero IP")
+	}
+	if len(text) == 0 {
+		return nil
+	}
+	var err error
+	*p, err = ParseIPPort(string(text))
+	return err
+}
+
 // FromStdAddr maps the components of a standard library TCPAddr or
 // UDPAddr into an IPPort.
 func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
