@@ -1151,6 +1151,61 @@ func TestParseIPPort(t *testing.T) {
 				t.Errorf("String = %q; want %q", got.String(), test.in)
 			}
 		})
+
+		// TextMarshal and TextUnmarhsal mostly behave like
+		// ParseIPPort and String. Divergent behavior are handled in
+		// TestIPPortMarshalUnmarshal.
+		t.Run(test.in + "/Marshal", func(t *testing.T) {
+			var got IPPort
+			jsin := `"` + test.in + `"`
+			err := json.Unmarshal([]byte(jsin), &got)
+			if err != nil {
+				if test.wantErr {
+					return
+				}
+				t.Fatal(err)
+			}
+			if got != test.want {
+				t.Errorf("got %v; want %v", got, test.want)
+			}
+			gotb, err := json.Marshal(got)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if string(gotb) != jsin {
+				t.Errorf("Marshal = %q; want %q", string(gotb), jsin)
+			}
+		})
+	}
+}
+
+func TestIPPortMarshalUnmarshal(t *testing.T) {
+	tests := []struct{
+		in string
+		want IPPort
+	}{
+		{"", IPPort{}},
+	}
+
+	for _, test := range tests {
+		t.Run(test.in, func(t *testing.T) {
+			orig := `"` + test.in + `"`
+
+			var ipp IPPort
+			if err := json.Unmarshal([]byte(orig), &ipp); err != nil {
+				t.Fatalf("failed to unmarshal: %v", err)
+			}
+
+			ippb, err := json.Marshal(ipp)
+			if err != nil {
+				t.Fatalf("failed to marshal: %v", err)
+			}
+
+			back := string(ippb)
+			if orig != back {
+				t.Errorf("Marshal = %q; want %q", back, orig)
+			}
+		})
 	}
 }
 
