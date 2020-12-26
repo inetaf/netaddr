@@ -17,186 +17,278 @@ import (
 	"sort"
 	"strings"
 	"testing"
+
+	"go4.org/intern"
 )
 
-func TestParseString(t *testing.T) {
-	tests := []string{
-		"1.2.3.4",
-		"0.0.0.0",
-		"::",
-		"::1",
-		"::1%zone",
-		"fe80::1cc0:3e8c:119f:c2e1%ens18",
-		"::ffff:c000:1234",
-		"::ffff:f077:ff",
-		"::ffff:c000:1234%zone",
-		"::f:ffff:0:0",
+func TestParseIP(t *testing.T) {
+	var validIPs = []struct {
+		in     string
+		ip     IP          // output of ParseIP()
+		ipaddr *net.IPAddr // output of .IPAddr()
+		str    string      // output of String(). If "", use in.
+	}{
+		// Basic zero IPv4 address.
+		{
+			in:     "0.0.0.0",
+			ip:     IP{0, 0xffff00000000, z4},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("0.0.0.0")},
+		},
+		// Basic non-zero IPv4 address.
+		{
+			in:     "192.168.140.255",
+			ip:     IP{0, 0xffffc0a88cff, z4},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("192.168.140.255")},
+		},
+		// IPv4 address in windows-style "print all the digits" form.
+		{
+			in:     "010.000.015.001",
+			ip:     IP{0, 0xffff0a000f01, z4},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("10.0.15.1")},
+			str:    "10.0.15.1",
+		},
+		// IPv4 address with a silly amount of leading zeros.
+		{
+			in:     "000001.00000002.00000003.000000004",
+			ip:     IP{0, 0xffff01020304, z4},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("1.2.3.4")},
+			str:    "1.2.3.4",
+		},
+		// Basic zero IPv6 address.
+		{
+			in:     "::",
+			ip:     IP{0, 0, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("::")},
+		},
+		// Localhost IPv6.
+		{
+			in:     "::1",
+			ip:     IP{0, 1, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("::1")},
+		},
+		// Fully expanded IPv6 address.
+		{
+			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b:430b",
+			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b430b, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b:430b")},
+		},
+		// IPv6 with elided fields in the middle.
+		{
+			in:     "fd7a:115c::626b:430b",
+			ip:     IP{0xfd7a115c00000000, 0x00000000626b430b, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c::626b:430b")},
+		},
+		// IPv6 with elided fields at the end.
+		{
+			in:     "fd7a:115c:a1e0:ab12:4843:cd96::",
+			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd9600000000, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96::")},
+		},
+		// IPv6 with the trailing 32 bits written as IPv4 dotted decimal.
+		{
+			in:     "::ffff:192.168.140.255",
+			ip:     IP{0, 0x0000ffffc0a88cff, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("::ffff:192.168.140.255")},
+			str:    "::ffff:c0a8:8cff",
+		},
+		// IPv6 with a zone specifier.
+		{
+			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b:430b%eth0",
+			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b430b, intern.Get("eth0")},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b:430b"), Zone: "eth0"},
+		},
+		// IPv6 with dotted decimal and zone specifier.
+		{
+			in:     "1:2::ffff:192.168.140.255%eth1",
+			ip:     IP{0x0001000200000000, 0x0000ffffc0a88cff, intern.Get("eth1")},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("1:2::ffff:192.168.140.255"), Zone: "eth1"},
+			str:    "1:2::ffff:c0a8:8cff%eth1",
+		},
 	}
-	for _, s := range tests {
-		t.Run(s, func(t *testing.T) {
-			ip, err := ParseIP(s)
+
+	for _, test := range validIPs {
+		t.Run(test.in, func(t *testing.T) {
+			got, err := ParseIP(test.in)
 			if err != nil {
 				t.Fatal(err)
 			}
-			ip2, err := ParseIP(s)
+			if got != test.ip {
+				t.Errorf("ParseIP(%q) got %#v, want %#v", test.in, got, test.ip)
+			}
+
+			// Check that ParseIP is a pure function.
+			got2, err := ParseIP(test.in)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if ip != ip2 {
-				t.Error("does not compare to self")
+			if got != got2 {
+				t.Errorf("ParseIP(%q) got 2 different results: %#v, %#v", test.in, got, got2)
 			}
-			back := ip.String()
-			if s != back {
-				t.Errorf("String = %q; want %q", back, s)
+
+			// Check that ParseIP(ip.String()) is the identity function.
+			s := got.String()
+			got3, err := ParseIP(s)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != got3 {
+				t.Errorf("ParseIP(%q) != ParseIP(ParseIP(%q).String()). Got %#v, want %#v", test.in, test.in, got3, got)
+			}
+
+			// Check that the slow-but-readable parser produces the same result.
+			slow, err := parseIPSlow(test.in)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != slow {
+				t.Errorf("ParseIP(%q) = %#v, parseIPSlow(%q) = %#v", test.in, got, test.in, slow)
+			}
+
+			// Check that IP converts to the correct stdlib value.
+			std := got.IPAddr()
+			std.IP = std.IP.To16() // Normalize encoding for comparison
+
+			if !reflect.DeepEqual(std, test.ipaddr) {
+				t.Errorf("ParseIP(%q).IPAddr() got %#v, want %#v", test.in, std, test.ipaddr)
+			}
+
+			// Check that the std IP converts back to the same value.
+			back, ok := FromStdIP(std.IP)
+			if !ok {
+				t.Fatalf("FromStdIP(ParseIP(%q).IPAddr()) failed", test.in)
+			}
+			// FromStdIP doesn't preserve the zone, so force it back by hand.
+			back.z = test.ip.z
+
+			if back != test.ip {
+				t.Errorf("FromStdIP(ParseIP(%q).IPAddr()) got %#v, want %#v", test.in, back, test.ip)
+			}
+
+			// Check that the parsed IP formats as expected.
+			s = got.String()
+			wants := test.str
+			if wants == "" {
+				wants = test.in
+			}
+			if s != wants {
+				t.Errorf("ParseIP(%q).String() got %q, want %q", test.in, s, wants)
+			}
+
+			// Check that MarshalText/UnmarshalText work similarly to
+			// ParseIP/String (see TestIPMarshalUnmarshal for
+			// marshal-specific behavior that's not common with
+			// ParseIP/String).
+			js := `"` + test.in + `"`
+			var jsgot IP
+			if err := json.Unmarshal([]byte(js), &jsgot); err != nil {
+				t.Fatal(err)
+			}
+			if jsgot != got {
+				t.Errorf("json.Unmarshal(%q) = %#v, want %#v", test.in, jsgot, got)
+			}
+			jsb, err := json.Marshal(jsgot)
+			if err != nil {
+				t.Fatal(err)
+			}
+			jswant := `"` + wants + `"`
+			jsback := string(jsb)
+			if jsback != jswant {
+				t.Errorf("Marshal(Unmarshal(%q)) = %#v, want %#v", test.in, jsback, wants)
 			}
 		})
 	}
-}
 
-func TestParseIPv4Zone(t *testing.T) {
-	ip, err := ParseIP("1.2.3.4%zone")
-	if err == nil {
-		t.Fatalf("expected error parsing v4 w/ zone; got %v", ip)
-	}
-}
-
-func TestParseIPMatchesStd(t *testing.T) {
-	tests := []string{
+	var invalidIPs = []string{
+		// Empty string
+		"",
+		// Garbage non-IP
 		"bad",
-		"1.2.3.4",
-		"0.0.0.0",
-		"::",
-		"::1",
-		"000000192.0000168.00000.00001", // https://play.golang.org/p/06oxvudU5DT
-		"::ffff:1.2.3.4",
-		"::ff:1.2.3.4",
-		"ab:cd::1.2.3.4", // 1.2.3.4 syntax with non-4in6 prefix
+		// Single number. Some parsers accept this as an IPv4 address in
+		// big-endian uint32 form, but we don't.
+		"1234",
+		// IPv4 with a zone specifier
+		"1.2.3.4%eth0",
+		// IPv4 in dotted octal form
+		"0300.0250.0214.0377",
+		// IPv4 in dotted hex form
+		"0xc0.0xa8.0x8c.0xff",
+		// IPv4 in class B form
+		"192.168.12345",
+		// IPv4 in class A form
+		"192.1234567",
+		// IPv4 with a field bigger than 1b
+		"192.168.300.1",
+		// IPv4 with too many fields
+		"192.168.0.1.5.6",
+		// IPv6 with not enough fields
+		"1:2:3:4:5:6:7",
+		// IPv6 with too many fields
+		"1:2:3:4:5:6:7:8:9",
+		// IPv6 with 8 fields and a :: expander
+		"1:2:3:4::5:6:7:8",
+		// IPv6 with a field bigger than 2b
+		"fe801::1",
+		// IPv6 with non-hex values in field
+		"fe80:tail:scal:e::",
 	}
-	for _, s := range tests {
+
+	for _, s := range invalidIPs {
 		t.Run(s, func(t *testing.T) {
-			ip, err := ParseIP(s)
-			if err != nil {
-				if net.ParseIP(s) == nil {
-					// Both failed to parse, so they match. Good.
-					return
-				}
-				t.Fatalf("our ParseIP: %v", err)
+			got, err := ParseIP(s)
+			if err == nil {
+				t.Errorf("ParseIP(%q) = %#v, want error", s, got)
 			}
-			stdIP := net.ParseIP(s)
-			if stdIP == nil {
-				t.Fatalf("std ParseIP: %v", err)
+
+			slow, err := parseIPSlow(s)
+			if err == nil {
+				t.Errorf("parseIPSlow(%q) = %#v, want error", s, slow)
 			}
-			ipBack, ok := FromStdIP(stdIP)
-			if !ok {
-				t.Fatalf("didn't map back")
+
+			std := net.ParseIP(s)
+			if std != nil {
+				t.Errorf("net.ParseIP(%q) = %#v, want error", s, std)
 			}
-			if ipBack == ip {
-				// Match.
+
+			if s == "" {
+				// Don't test unmarshaling of "" here, do it in
+				// IPMarshalUnmarshal.
 				return
 			}
-			if ip.Is4in6() {
-				// Don't expect a match.
-				t.Logf("expected difference; we got %v; std can't distinguish 4-in-6 and got %v", ip, stdIP)
-				return
+			var jsgot IP
+			js := []byte(`"` + s + `"`)
+			if err := json.Unmarshal(js, &jsgot); err == nil {
+				t.Errorf("json.Unmarshal(%q) = %#v, want error", s, jsgot)
 			}
-			t.Fatalf("our parse %v != (std parse %v => back as %v)",
-				ip, stdIP, ipBack)
 		})
 	}
 }
 
 func TestIPMarshalUnmarshal(t *testing.T) {
-	tests := []string{
-		"",
-		"1.2.3.4",
-		"0.0.0.0",
-		"::",
-		"::1",
-		"fe80::1cc0:3e8c:119f:c2e1%ens18",
-		"::ffff:c000:1234",
+	// This only tests the cases where Marshal/Unmarshal diverges from
+	// the behavior of ParseIP/String. For the rest of the test cases,
+	// see TestParseIP above.
+	orig := `""`
+	var ip IP
+	if err := json.Unmarshal([]byte(orig), &ip); err != nil {
+		t.Fatalf("Unmarshal(%q) got error %v", orig, err)
+	}
+	if !ip.IsZero() {
+		t.Errorf("Unmarshal(%q) is not the zero IP", orig)
 	}
 
-	for _, s := range tests {
-		t.Run(s, func(t *testing.T) {
-			// Ensure that JSON  (and by extension, text) marshaling is
-			// sane by entering quoted input.
-			orig := `"` + s + `"`
-
-			var ip IP
-			if err := json.Unmarshal([]byte(orig), &ip); err != nil {
-				t.Fatalf("failed to unmarshal: %v", err)
-			}
-
-			ipb, err := json.Marshal(ip)
-			if err != nil {
-				t.Fatalf("failed to marshal: %v", err)
-			}
-
-			back := string(ipb)
-			if orig != back {
-				t.Errorf("Marshal = %q; want %q", back, orig)
-			}
-		})
+	jsb, err := json.Marshal(ip)
+	if err != nil {
+		t.Fatalf("Marshal(%v) got error %v", ip, err)
 	}
-}
+	back := string(jsb)
+	if back != orig {
+		t.Errorf("Marshal(Unmarshal(%q)) got %q, want %q", orig, back, orig)
+	}
 
-func TestIPUnmarshalTextNonZero(t *testing.T) {
-	ip := mustIP("::1")
-	if err := ip.UnmarshalText([]byte("xxx")); err == nil {
+	// Cannot unmarshal into a non-zero IP
+	ip = MustParseIP("1.2.3.4")
+	if err := ip.UnmarshalText([]byte("::1")); err == nil {
 		t.Fatal("unmarshaled into non-empty IP")
-	}
-}
-
-func TestIPIPAddr(t *testing.T) {
-	tests := []struct {
-		name string
-		ip   IP
-		ipa  *net.IPAddr
-	}{
-		{
-			name: "nil",
-			ipa:  &net.IPAddr{},
-		},
-		{
-			name: "v4Addr",
-			ip:   mustIP("192.0.2.1"),
-			ipa: &net.IPAddr{
-				IP: net.IPv4(192, 0, 2, 1).To4(),
-			},
-		},
-		{
-			name: "v6Addr",
-			ip:   mustIP("2001:db8::1"),
-			ipa: &net.IPAddr{
-				IP: net.ParseIP("2001:db8::1"),
-			},
-		},
-		{
-			name: "v6AddrZone",
-			ip:   mustIP("fe80::1%eth0"),
-			ipa: &net.IPAddr{
-				IP:   net.ParseIP("fe80::1"),
-				Zone: "eth0",
-			},
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got := tt.ip.IPAddr()
-			if !reflect.DeepEqual(tt.ipa, got) {
-				t.Errorf("IPAddr = %+v; want %+v", got, tt.ipa)
-			}
-
-			if got.Zone == "" && tt.ip != (IP{}) {
-				back, ok := FromStdIP(got.IP)
-				if !ok {
-					t.Errorf("FromStdIP failed")
-				} else if back != tt.ip {
-					t.Errorf("FromStdIP = %v; want %v", back, tt.ip)
-				}
-			}
-		})
 	}
 }
 
