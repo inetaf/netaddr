@@ -179,24 +179,51 @@ func MustParseIP(s string) IP {
 // net.ParseIP at the moment, so returning ok=false from here just
 // means it'll try it a slower way.
 func parseIPv4(s string) (ip IP, ok bool) {
-	if len(s) < 7 || len(s) > 15 || strings.Count(s, ".") != 3 {
-		return ip, false
-	}
-	var v [4]uint64
-	for i := range v {
-		var numStr string
-		if dot := strings.IndexByte(s, '.'); dot == -1 {
-			numStr = s
-		} else {
-			numStr, s = s[:dot], s[dot+1:]
+	var ip4 [4]byte
+
+	for i := 0; i < 4; i++ {
+		var (
+			j   int
+			acc uint16
+		)
+		// Parse one byte of digits. Bail if we overflow, stop at
+		// first non-digit.
+		//
+		// As of Go 1.15, don't try to factor this digit reading into
+		// a helper function. Its complexity is slightly too high for
+		// inlining, which ends up costing +50% in parse time.
+		for j = 0; j < len(s); j++ {
+			if s[j] < '0' || s[j] > '9' {
+				break
+			}
+			acc = (acc * 10) + uint16(s[j]-'0')
+			if acc > 255 {
+				return IP{}, false
+			}
 		}
-		var err error
-		v[i], err = strconv.ParseUint(numStr, 10, 8)
-		if err != nil {
-			return ip, false
+		// There must be at least 1 digit per quad.
+		if j == 0 {
+			return IP{}, false
 		}
+
+		ip4[i] = uint8(acc)
+
+		// Non-final byte must be followed by a dot
+		if i < 3 {
+			if len(s) == j || s[j] != '.' {
+				return IP{}, false
+			}
+			j++
+		}
+
+		// Advance to the next set of digits.
+		s = s[j:]
 	}
-	return IPv4(uint8(v[0]), uint8(v[1]), uint8(v[2]), uint8(v[3])), true
+	if len(s) != 0 {
+		return IP{}, false
+	}
+
+	return IPv4(ip4[0], ip4[1], ip4[2], ip4[3]), true
 }
 
 // FromStdIP returns an IP from the standard library's IP type.
