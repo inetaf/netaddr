@@ -234,16 +234,16 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 // v4 returns the i'th byte of ip. If ip is not an IPv4, v4 returns
 // unspecified garbage.
 func (ip IP) v4(i uint8) uint8 {
-	return uint8(ip.lo>>((3-i)*8))
+	return uint8(ip.lo >> ((3 - i) * 8))
 }
 
 // v6 returns the i'th byte of ip. If ip is an IPv4 address, this
 // accesses the IPv4-mapped IPv6 address form of the IP.
 func (ip IP) v6(i uint8) uint8 {
 	if i >= 8 {
-		return uint8(ip.lo>>((15-i)*8))
+		return uint8(ip.lo >> ((15 - i) * 8))
 	} else {
-		return uint8(ip.hi>>((7-i)*8))
+		return uint8(ip.hi >> ((7 - i) * 8))
 	}
 }
 
