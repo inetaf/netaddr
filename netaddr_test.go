@@ -1155,7 +1155,7 @@ func TestParseIPPort(t *testing.T) {
 		// TextMarshal and TextUnmarhsal mostly behave like
 		// ParseIPPort and String. Divergent behavior are handled in
 		// TestIPPortMarshalUnmarshal.
-		t.Run(test.in + "/Marshal", func(t *testing.T) {
+		t.Run(test.in+"/Marshal", func(t *testing.T) {
 			var got IPPort
 			jsin := `"` + test.in + `"`
 			err := json.Unmarshal([]byte(jsin), &got)
@@ -1180,8 +1180,8 @@ func TestParseIPPort(t *testing.T) {
 }
 
 func TestIPPortMarshalUnmarshal(t *testing.T) {
-	tests := []struct{
-		in string
+	tests := []struct {
+		in   string
 		want IPPort
 	}{
 		{"", IPPort{}},
@@ -2010,7 +2010,113 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 		}
 	}
 	return
+}
 
+// TestIPSetRanges tests IPSet.Ranges against 64k
+// patterns of sets of ranges, checking the real implementation
+// against the test's separate implementation.
+//
+// For each of uint16 pattern, each set bit is treated as an IP that
+// should be in the set's resultant Ranges.
+func TestIPSetRanges(t *testing.T) {
+	upper := 0xffff
+	if testing.Short() {
+		upper = 0x0fff
+	}
+	for pat := 0; pat <= upper; pat++ {
+		var s IPSet
+		var from, to IP
+		ranges := make([]IPRange, 0)
+		flush := func() {
+			r := IPRange{From: from, To: to}
+			s.AddRange(r)
+			ranges = append(ranges, r)
+			from, to = IP{}, IP{}
+		}
+		for b := uint16(0); b < 16; b++ {
+			if uint16(pat)&(1<<b) != 0 {
+				ip := IPv4(1, 0, 0, uint8(b))
+				to = ip
+				if from.IsZero() {
+					from = ip
+				}
+				continue
+			}
+			if !from.IsZero() {
+				flush()
+			}
+		}
+		if !from.IsZero() {
+			flush()
+		}
+		got := s.Ranges()
+		if !reflect.DeepEqual(got, ranges) {
+			t.Errorf("for %016b: got %v; want %v", pat, got, ranges)
+		}
+	}
+}
+
+func TestIPSetRangesStress(t *testing.T) {
+	n := 500
+	if testing.Short() {
+		n /= 10
+	}
+	randRange := func() (a, b int, r IPRange) {
+		a, b = rand.Intn(0x10000), rand.Intn(0x10000)
+		if a > b {
+			a, b = b, a
+		}
+		return a, b, IPRange{
+			From: IPv4(0, 0, uint8(a>>8), uint8(a)),
+			To:   IPv4(0, 0, uint8(b>>8), uint8(b)),
+		}
+	}
+	for i := 0; i < n; i++ {
+		var s IPSet
+		var want [0xffff]bool
+		// Add some ranges
+		const maxAdd = 10
+		for i := 0; i < 1+rand.Intn(2); i++ {
+			a, b, r := randRange()
+			for i := a; i <= b; i++ {
+				want[i] = true
+			}
+			s.AddRange(r)
+		}
+		// Remove some ranges
+		for i := 0; i < rand.Intn(3); i++ {
+			a, b, r := randRange()
+			for i := a; i <= b; i++ {
+				want[i] = false
+			}
+			s.RemoveRange(r)
+		}
+		ranges := s.Ranges()
+
+		// Make sure no ranges are adjacent or overlapping
+		for i, r := range ranges {
+			if i == 0 {
+				continue
+			}
+			if ranges[i-1].To.Compare(r.From) != -1 {
+				t.Fatalf("overlapping ranges: %v", ranges)
+			}
+		}
+
+		// Copy the ranges back to a new set before using
+		// ContainsFunc, in case the ContainsFunc implementation
+		// changes in the future to not use Ranges itself:
+		var s2 IPSet
+		for _, r := range ranges {
+			s2.AddRange(r)
+		}
+		contains := s2.ContainsFunc()
+		for i, want := range want {
+			if got := contains(IPv4(0, 0, uint8(i>>8), uint8(i))); got != want {
+				t.Fatal("failed")
+			}
+		}
+	}
 }
 
 func TestPointLess(t *testing.T) {
