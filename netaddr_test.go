@@ -214,8 +214,14 @@ func TestParseIP(t *testing.T) {
 		"0xc0.0xa8.0x8c.0xff",
 		// IPv4 in class B form
 		"192.168.12345",
+		// IPv4 in class B form, with a small enough number to be
+		// parseable as a regular dotted decimal field.
+		"127.0.1",
 		// IPv4 in class A form
 		"192.1234567",
+		// IPv4 in class A form, with a small enough number to be
+		// parseable as a regular dotted decimal field.
+		"127.1",
 		// IPv4 with a field bigger than 1b
 		"192.168.300.1",
 		// IPv4 with too many fields
