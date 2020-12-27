@@ -46,6 +46,9 @@ func parseIPSlow(s string) (IP, error) {
 		// No zone, that's fine.
 	case 2:
 		s, zone = fs[0], fs[1]
+		if zone == "" {
+			return IP{}, fmt.Errorf("netaddr.ParseIP(%q): no zone after zone specifier", s)
+		}
 	default:
 		return IP{}, fmt.Errorf("netaddr.ParseIP(%q): too many zone specifiers", s) // TODO: less specific?
 	}
