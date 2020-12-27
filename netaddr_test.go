@@ -84,6 +84,20 @@ func TestParseIP(t *testing.T) {
 			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd9600000000, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96::")},
 		},
+		// IPv6 with single elided field at the end.
+		{
+			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b::",
+			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b0000, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b::")},
+			str:    "fd7a:115c:a1e0:ab12:4843:cd96:626b:0",
+		},
+		// IPv6 with single elided field in the middle.
+		{
+			in:     "fd7a:115c:a1e0::4843:cd96:626b:430b",
+			ip:     IP{0xfd7a115ca1e00000, 0x4843cd96626b430b, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0::4843:cd96:626b:430b")},
+			str:    "fd7a:115c:a1e0:0:4843:cd96:626b:430b",
+		},
 		// IPv6 with the trailing 32 bits written as IPv4 dotted decimal.
 		{
 			in:     "::ffff:192.168.140.255",
@@ -236,6 +250,8 @@ func TestParseIP(t *testing.T) {
 		"fe801::1",
 		// IPv6 with non-hex values in field
 		"fe80:tail:scal:e::",
+		// IPv6 with a zone delimiter but no zone.
+		"fe80::1%",
 	}
 
 	for _, s := range invalidIPs {
@@ -1129,7 +1145,7 @@ func TestParseIPPrefixError(t *testing.T) {
 		},
 		{
 			prefix: "1.257.1.1/24",
-			errstr: "unable to parse IP",
+			errstr: "value >255",
 		},
 		{
 			prefix: "1.1.1.0/q",
@@ -1191,14 +1207,16 @@ func TestParseIPError(t *testing.T) {
 			ip: "localhost",
 		},
 		{
-			ip: "500.0.0.1",
+			ip:     "500.0.0.1",
+			errstr: "field has value >255",
 		},
 		{
-			ip: "::gggg%eth0",
+			ip:     "::gggg%eth0",
+			errstr: "must have at least one digit",
 		},
 		{
 			ip:     "fe80::1cc0:3e8c:119f:c2e1%",
-			errstr: "missing zone",
+			errstr: "zone must be a non-empty string",
 		},
 		{
 			ip:     "%eth0",
@@ -1440,8 +1458,7 @@ var parseBenchInputs = []struct {
 }
 
 func BenchmarkParseIP(b *testing.B) {
-	z := intern.Get("eth1") // Pin to not benchmark the intern package
-	_ = z
+	sinkInternValue = intern.Get("eth1") // Pin to not benchmark the intern package
 	for _, test := range parseBenchInputs {
 		b.Run(test.name, func(b *testing.B) {
 			b.ReportAllocs()
@@ -2496,10 +2513,11 @@ func TestPointLess(t *testing.T) {
 }
 
 var (
-	sinkIP       IP
-	sinkStdIP    net.IP
-	sinkIPPort   IPPort
-	sinkIPPrefix IPPrefix
+	sinkIP          IP
+	sinkStdIP       net.IP
+	sinkIPPort      IPPort
+	sinkIPPrefix    IPPrefix
+	sinkInternValue *intern.Value
 )
 
 func TestNoAllocs(t *testing.T) {
@@ -2514,10 +2532,6 @@ func TestNoAllocs(t *testing.T) {
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
 	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
 	test("ParseIP_4", func() { sinkIP, _ = ParseIP("1.2.3.4") })
-
-	// TODO: currently 4
-	// test("ParseIP_6", func() { sinkIP, _ = ParseIP("[::1]") })
-
-	// TODO: currently 1
-	// test("ParseIPPort", func() { sinkIPPort, _ = ParseIPPort("[::1]:1234") })
+	test("ParseIP_6", func() { sinkIP, _ = ParseIP("::1") })
+	test("ParseIPPort", func() { sinkIPPort, _ = ParseIPPort("[::1]:1234") })
 }
