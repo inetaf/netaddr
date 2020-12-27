@@ -1428,31 +1428,38 @@ func BenchmarkIPv4Contains(b *testing.B) {
 	}
 }
 
-func BenchmarkParseIPv4(b *testing.B) {
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		ParseIP("192.168.1.1")
+var parseBenchInputs = []struct {
+	name string
+	ip   string
+}{
+	{"v4", "192.168.1.1"},
+	{"v6", "fd7a:115c:a1e0:ab12:4843:cd96:626b:430b"},
+	{"v6_ellipsis", "fd7a:115c::626b:430b"},
+	{"v6_v4", "::ffff:192.168.140.255"},
+	{"v6_zone", "1:2::ffff:192.168.140.255%eth1"},
+}
+
+func BenchmarkParseIP(b *testing.B) {
+	z := intern.Get("eth1") // Pin to not benchmark the intern package
+	_ = z
+	for _, test := range parseBenchInputs {
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				sinkIP, _ = ParseIP(test.ip)
+			}
+		})
 	}
 }
 
-func BenchmarkParseIPv6(b *testing.B) {
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		ParseIP("fe80::1cc0:3e8c:119f:c2e1%ens18")
-	}
-}
-
-func BenchmarkStdParseIPv4(b *testing.B) {
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		net.ParseIP("192.168.1.1")
-	}
-}
-
-func BenchmarkStdParseIPv6(b *testing.B) {
-	b.ReportAllocs()
-	for i := 0; i < b.N; i++ {
-		net.ParseIP("fe80::1cc0:3e8c:119f:c2e1")
+func BenchmarkStdParseIP(b *testing.B) {
+	for _, test := range parseBenchInputs {
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				sinkStdIP = net.ParseIP(test.ip)
+			}
+		})
 	}
 }
 
@@ -2488,9 +2495,12 @@ func TestPointLess(t *testing.T) {
 
 }
 
-var sinkIP IP
-var sinkIPPort IPPort
-var sinkIPPrefix IPPrefix
+var (
+	sinkIP       IP
+	sinkStdIP    net.IP
+	sinkIPPort   IPPort
+	sinkIPPrefix IPPrefix
+)
 
 func TestNoAllocs(t *testing.T) {
 	test := func(name string, f func()) {
