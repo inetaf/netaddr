@@ -260,12 +260,14 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 
 // v4 returns the i'th byte of ip. If ip is not an IPv4, v4 returns
 // unspecified garbage.
+//gcassert:inline
 func (ip IP) v4(i uint8) uint8 {
 	return uint8(ip.lo >> ((3 - i) * 8))
 }
 
 // v6 returns the i'th byte of ip. If ip is an IPv4 address, this
 // accesses the IPv4-mapped IPv6 address form of the IP.
+//gcassert:inline
 func (ip IP) v6(i uint8) uint8 {
 	if i >= 8 {
 		return uint8(ip.lo >> ((15 - i) * 8))
@@ -278,12 +280,14 @@ func (ip IP) v6(i uint8) uint8 {
 // The zero value is not a valid IP address of any type.
 //
 // Note that "0.0.0.0" and "::" are not the zero value.
+//gcassert:inline
 func (ip IP) IsZero() bool { return ip == IP{} }
 
 // BitLen returns the number of bits in the IP address:
 // 32 for IPv4 or 128 for IPv6.
 // For the zero value (see IP.IsZero), it returns 0.
 // For IP4-mapped IPv6 addresses, it returns 128.
+//gcassert:inline
 func (ip IP) BitLen() uint8 {
 	switch ip.z {
 	case z0:
@@ -370,17 +374,20 @@ func (ip IP) IPAddr() *net.IPAddr {
 // Is4 reports whether ip is an IPv4 address.
 //
 // It returns false for IP4-mapped IPv6 addresses. See IP.Unmap.
+//gcassert:inline
 func (ip IP) Is4() bool {
 	return ip.z == z4
 }
 
 // Is4in6 reports whether ip is an IPv4-mapped IPv6 address.
+//gcassert:inline
 func (ip IP) Is4in6() bool {
 	return ip.Is6() && ip.hi == 0 && ip.lo>>32 == 0xffff
 }
 
 // Is6 reports whether ip is an IPv6 address, including IPv4-mapped
 // IPv6 addresses.
+//gcassert:inline
 func (ip IP) Is6() bool {
 	return ip.z != z0 && ip.z != z4
 }
@@ -414,6 +421,7 @@ func (ip IP) WithZone(zone string) IP {
 
 // IsLinkLocalUnicast reports whether ip is a link-local unicast address.
 // If ip is the zero value, it will return false.
+//gcassert:inline
 func (ip IP) IsLinkLocalUnicast() bool {
 	if ip.Is4() {
 		return ip.v4(0) == 169 && ip.v4(1) == 254
@@ -426,6 +434,7 @@ func (ip IP) IsLinkLocalUnicast() bool {
 
 // IsLoopback reports whether ip is a loopback address. If ip is the zero value,
 // it will return false.
+//gcassert:inline
 func (ip IP) IsLoopback() bool {
 	if ip.Is4() {
 		return ip.v4(0) == 127
@@ -438,6 +447,7 @@ func (ip IP) IsLoopback() bool {
 
 // IsMulticast reports whether ip is a multicast address. If ip is the zero
 // value, it will return false.
+//gcassert:inline
 func (ip IP) IsMulticast() bool {
 	if ip.Is4() {
 		return ip.v4(0)&0xf0 == 0xe0
@@ -694,9 +704,11 @@ type IPPrefix struct {
 }
 
 // IsZero reports whether p is its zero value.
+//gcassert:inline
 func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
 
 // IsSingleIP reports whether p contains exactly one IP.
+//gcassert:inline
 func (p IPPrefix) IsSingleIP() bool { return p.Bits != 0 && p.Bits == p.IP.BitLen() }
 
 // FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
@@ -803,6 +815,7 @@ func (p IPPrefix) IPNet() *net.IPNet {
 
 // mask4 returns a bit mask that selects the topmost n bits of a
 // uint32.
+//gcassert:inline
 func mask4(n uint8) uint32 {
 	return ^uint32(0) << (32 - n)
 }
@@ -811,6 +824,7 @@ func mask4(n uint8) uint32 {
 // 128-bit number. Due to Go's lack of 128-bit numeric types, the mask
 // is returned as a pair of uint64s, in the same order as the uint64
 // pair in the IP type.
+//gcassert:inline
 func mask6(n uint8) (hi, lo uint64) {
 	if n > 64 {
 		return ^uint64(0), ^uint64(0) << (128 - n)
@@ -1025,16 +1039,19 @@ type ip16 [16]byte
 
 // bitSet reports whether the given bit in the address is set.
 // (bit 0 is the most significant bit in ip[0]; bit 127 is last)
+//gcassert:inline
 func (ip ip16) bitSet(bit uint8) bool {
 	i, s := bit/8, 7-(bit%8)
 	return ip[i]&(1<<s) != 0
 }
 
+//gcassert:inline
 func (ip *ip16) set(bit uint8) {
 	i, s := bit/8, 7-(bit%8)
 	ip[i] |= 1 << s
 }
 
+//gcassert:inline
 func (ip *ip16) clear(bit uint8) {
 	i, s := bit/8, 7-(bit%8)
 	ip[i] &^= 1 << s
