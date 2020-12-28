@@ -1326,14 +1326,10 @@ func TestUDPAddrAllocs(t *testing.T) {
 	}
 }
 
-func mustIP(s string) IP {
-	ip, err := ParseIP(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return ip
-}
+var (
+	mustIP       = MustParseIP
+	mustIPPrefix = MustParseIPPrefix
+)
 
 func mustIPs(strs ...string) []IP {
 	var res []IP
@@ -1341,15 +1337,6 @@ func mustIPs(strs ...string) []IP {
 		res = append(res, mustIP(s))
 	}
 	return res
-}
-
-func mustIPPrefix(s string) IPPrefix {
-	p, err := ParseIPPrefix(s)
-	if err != nil {
-		panic(err)
-	}
-
-	return p
 }
 
 func BenchmarkStdIPv4(b *testing.B) {
@@ -2006,6 +1993,34 @@ func TestIPBitLen(t *testing.T) {
 		got := tt.ip.BitLen()
 		if got != tt.want {
 			t.Errorf("BitLen(%v) = %d; want %d", tt.ip, got, tt.want)
+		}
+	}
+}
+
+func TestIPPrefixContains(t *testing.T) {
+	tests := []struct {
+		ipp  IPPrefix
+		ip   IP
+		want bool
+	}{
+		{mustIPPrefix("9.8.7.6/0"), mustIP("9.8.7.6"), true},
+		{mustIPPrefix("9.8.7.6/16"), mustIP("9.8.7.6"), true},
+		{mustIPPrefix("9.8.7.6/16"), mustIP("9.8.6.4"), true},
+		{mustIPPrefix("9.8.7.6/16"), mustIP("9.9.7.6"), false},
+		{mustIPPrefix("9.8.7.6/32"), mustIP("9.8.7.6"), true},
+		{mustIPPrefix("9.8.7.6/32"), mustIP("9.8.7.7"), false},
+		{mustIPPrefix("9.8.7.6/32"), mustIP("9.8.7.7"), false},
+		{mustIPPrefix("::1/0"), mustIP("::1"), true},
+		{mustIPPrefix("::1/0"), mustIP("::2"), true},
+		{mustIPPrefix("::1/127"), mustIP("::1"), true},
+		{mustIPPrefix("::1/127"), mustIP("::2"), false},
+		{mustIPPrefix("::1/128"), mustIP("::1"), true},
+		{mustIPPrefix("::1/127"), mustIP("::2"), false},
+	}
+	for _, tt := range tests {
+		got := tt.ipp.Contains(tt.ip)
+		if got != tt.want {
+			t.Errorf("(%v).Contains(%v) = %v want %v", tt.ipp, tt.ip, got, tt.want)
 		}
 	}
 }

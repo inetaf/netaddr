@@ -829,10 +829,11 @@ func (p IPPrefix) Contains(addr IP) bool {
 		return false
 	}
 	if addr.Is4() {
-		return uint32(addr.lo)&mask4(p.Bits) == uint32(p.IP.lo)
+		m := mask4(p.Bits)
+		return uint32(addr.lo)&m == uint32(p.IP.lo)&m
 	} else {
 		mhi, mlo := mask6(p.Bits)
-		return addr.hi&mhi == p.IP.hi && addr.lo&mlo == p.IP.lo
+		return addr.hi&mhi == p.IP.hi&mhi && addr.lo&mlo == p.IP.lo&mlo
 	}
 }
 
