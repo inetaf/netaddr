@@ -1315,7 +1315,7 @@ func (s *IPSet) Ranges() []IPRange {
 	}
 
 	// Now build 'want', like points but with "remove" ranges removed
-	// and adjancent blocks merged, and all elements alternating between
+	// and adjacent blocks merged, and all elements alternating between
 	// start and end.
 	want := points[:0]
 	var addDepth, removeDepth int
