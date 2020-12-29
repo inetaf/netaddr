@@ -1143,6 +1143,8 @@ func (r IPRange) Overlaps(o IPRange) bool {
 
 // ip16 represents a mutable IP address, either IPv4 (in IPv6-mapped
 // form) or IPv6.
+//
+// TODO(bradfitz): ditch this type now and fold into IP? Not used much.
 type ip16 [16]byte
 
 // bitSet reports whether the given bit in the address is set.
@@ -1194,28 +1196,28 @@ func (r IPRange) Prefixes() []IPPrefix {
 	if !r.Valid() {
 		return nil
 	}
-	var makePrefix prefixMaker
-	if r.From.Is4() {
-		makePrefix = func(ip16 ip16, bits uint8) IPPrefix {
-			return IPPrefix{IPFrom16([16]byte(ip16)), bits - 12*8}
-		}
-	} else {
-		makePrefix = func(ip16 ip16, bits uint8) IPPrefix {
-			return IPPrefix{IPv6Raw([16]byte(ip16)), bits}
-		}
-	}
 	a16, b16 := ip16(r.From.As16()), ip16(r.To.As16())
-	return appendRangePrefixes(nil, makePrefix, a16, b16)
+	return appendRangePrefixes(nil, r.prefixMaker(), a16, b16)
 }
 
-func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a16, b16 ip16) []IPPrefix {
-	common := uint8(0)
+func (r IPRange) prefixMaker() prefixMaker {
+	if r.From.Is4() {
+		return func(ip16 ip16, bits uint8) IPPrefix {
+			return IPPrefix{IPFrom16([16]byte(ip16)), bits - 12*8}
+		}
+	}
+	return func(ip16 ip16, bits uint8) IPPrefix {
+		return IPPrefix{IPv6Raw([16]byte(ip16)), bits}
+	}
+}
+
+func comparePrefixes(a16, b16 ip16) (common uint8, aAllZero, bAllSet bool) {
 	for common < 128 && a16.bitSet(common) == b16.bitSet(common) {
 		common++
 	}
 	// See whether a16 and b16, after their common shared bits, end
 	// in all zero bits or all one bits, respectively.
-	aAllZero, bAllSet := true, true
+	aAllZero, bAllSet = true, true
 	for i := common; i < 128; i++ {
 		if a16.bitSet(i) {
 			aAllZero = false
@@ -1228,6 +1230,24 @@ func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a16, b16 ip16) 
 			break
 		}
 	}
+	return
+}
+
+// Prefix returns r as an IPPrefix, if it can be presented exactly as such.
+// If r is not valid or is not exactly equal to one prefix, ok is false.
+func (r IPRange) Prefix() (p IPPrefix, ok bool) {
+	if !r.Valid() {
+		return
+	}
+	a16, b16 := ip16(r.From.As16()), ip16(r.To.As16())
+	if common, aAllZero, bAllSet := comparePrefixes(a16, b16); aAllZero && bAllSet {
+		return r.prefixMaker()(a16, common), true
+	}
+	return
+}
+
+func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a16, b16 ip16) []IPPrefix {
+	common, aAllZero, bAllSet := comparePrefixes(a16, b16)
 	if aAllZero && bAllSet {
 		// a16 to b16 represents a whole range, like 10.50.0.0/16.
 		// (a16 being 10.50.0.0 and b16 being 10.50.255.255)
