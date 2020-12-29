@@ -1943,6 +1943,61 @@ func TestRangePrefixes(t *testing.T) {
 	}
 }
 
+func TestIPRangeContains(t *testing.T) {
+	type rtest struct {
+		ip   IP
+		want bool
+	}
+	tests := []struct {
+		r      IPRange
+		rtests []rtest
+	}{
+		{
+			IPRange{From: mustIP("10.0.0.2"), To: mustIP("10.0.0.4")},
+			[]rtest{
+				{mustIP("10.0.0.1"), false},
+				{mustIP("10.0.0.2"), true},
+				{mustIP("10.0.0.3"), true},
+				{mustIP("10.0.0.4"), true},
+				{mustIP("10.0.0.5"), false},
+				{IP{}, false},
+				{mustIP("::"), false},
+			},
+		},
+		{
+			IPRange{From: mustIP("::1"), To: mustIP("::ffff")},
+			[]rtest{
+				{mustIP("::0"), false},
+				{mustIP("::1"), true},
+				{mustIP("::ffff"), true},
+				{mustIP("1::"), false},
+				{mustIP("0.0.0.1"), false},
+				{IP{}, false},
+			},
+		},
+		{
+			IPRange{From: mustIP("10.0.0.2"), To: mustIP("::")}, // invalid
+			[]rtest{
+				{mustIP("10.0.0.2"), false},
+			},
+		},
+		{
+			IPRange{},
+			[]rtest{
+				{IP{}, false},
+			},
+		},
+	}
+	for _, tt := range tests {
+		for _, rt := range tt.rtests {
+			got := tt.r.Contains(rt.ip)
+			if got != rt.want {
+				t.Errorf("Range(%v).Contains(%v) = %v; want %v", tt.r, rt.ip, got, rt.want)
+			}
+		}
+	}
+}
+
 func TestIPNextPrior(t *testing.T) {
 	tests := []struct {
 		ip    IP

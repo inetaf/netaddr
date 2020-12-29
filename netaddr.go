@@ -959,6 +959,15 @@ func (r IPRange) Valid() bool {
 		!r.To.Less(r.From)
 }
 
+// Contains reports whether the range r includes addr.
+//
+// An invalid range always reports false.
+func (r IPRange) Contains(addr IP) bool {
+	return r.Valid() &&
+		r.From.Compare(addr) <= 0 &&
+		r.To.Compare(addr) >= 0
+}
+
 // ip16 represents a mutable IP address, either IPv4 (in IPv6-mapped
 // form) or IPv6.
 type ip16 [16]byte
