@@ -2122,6 +2122,36 @@ func TestIPRangeOverlaps(t *testing.T) {
 	}
 }
 
+func TestIPRangePrefix(t *testing.T) {
+	tests := []struct {
+		r    IPRange
+		want IPPrefix
+	}{
+		{IPRange{mustIP("10.0.0.0"), mustIP("10.0.0.255")}, mustIPPrefix("10.0.0.0/24")},
+		{IPRange{mustIP("10.0.0.0"), mustIP("10.0.0.254")}, IPPrefix{}},
+		{IPRange{mustIP("fc00::"), mustIP("fe00::").Prior()}, mustIPPrefix("fc00::/7")},
+	}
+	for _, tt := range tests {
+		got, ok := tt.r.Prefix()
+		if ok != (got != IPPrefix{}) {
+			t.Errorf("for %v, Prefix() results inconsistent: %v, %v", tt.r, got, ok)
+		}
+		if got != tt.want {
+			t.Errorf("for %v, Prefix = %v; want %v", tt.r, got, tt.want)
+		}
+	}
+
+	allocs := int(testing.AllocsPerRun(1000, func() {
+		tt := tests[0]
+		if _, ok := tt.r.Prefix(); !ok {
+			t.Fatal("expected okay")
+		}
+	}))
+	if allocs != 0 {
+		t.Errorf("allocs = %v", allocs)
+	}
+}
+
 func TestIPNextPrior(t *testing.T) {
 	tests := []struct {
 		ip    IP

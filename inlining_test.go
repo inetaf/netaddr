@@ -42,7 +42,6 @@ func TestInlining(t *testing.T) {
 	})
 	for _, want := range []string{
 		"(*IPSet).Add",
-		"(*IPSet).Ranges.func1",
 		"(*IPSet).Remove",
 		"(*IPSet).RemoveRange",
 		"(*ip16).clear",
@@ -69,8 +68,6 @@ func TestInlining(t *testing.T) {
 		"IPPrefix.IsZero",
 		"IPPrefix.Masked",
 		"IPPrefix.String",
-		"IPRange.Prefixes.func1",
-		"IPRange.Prefixes.func2",
 		"IPv4",
 		"IPv6LinkLocalAllNodes",
 		"IPv6Unspecified",
