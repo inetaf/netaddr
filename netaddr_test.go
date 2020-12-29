@@ -2015,6 +2015,59 @@ func TestIPRangeContains(t *testing.T) {
 	}
 }
 
+func TestIPRangeOverlaps(t *testing.T) {
+	tests := []struct {
+		r, o IPRange
+		want bool
+	}{
+		{
+			IPRange{},
+			IPRange{},
+			false,
+		},
+		{
+			IPRange{mustIP("10.0.0.1"), mustIP("10.0.0.3")},
+			IPRange{mustIP("10.0.0.3"), mustIP("10.0.0.4")},
+			true, // overlaps on edge
+		},
+		{
+			IPRange{mustIP("10.0.0.1"), mustIP("10.0.0.3")},
+			IPRange{mustIP("10.0.0.2"), mustIP("10.0.0.4")},
+			true, // overlaps in middle
+		},
+		{
+			IPRange{mustIP("10.0.0.1"), mustIP("10.0.0.3")},
+			IPRange{mustIP("10.0.0.4"), mustIP("10.0.0.4")},
+			false, // doesn't overlap
+		},
+		{
+			IPRange{mustIP("10.0.0.1"), mustIP("10.0.0.3")},
+			IPRange{mustIP("10.0.0.0"), mustIP("10.0.0.5")},
+			true, // one fully inside the other
+		},
+		{
+			IPRange{mustIP("10.0.0.1"), mustIP("10.0.0.3")},
+			IPRange{mustIP("::1"), mustIP("::2")},
+			false,
+		},
+		{
+			IPRange{mustIP("::"), mustIP("ff::")},
+			IPRange{mustIP("cc::1"), mustIP("cc::2")},
+			true,
+		},
+	}
+	for _, tt := range tests {
+		got := tt.r.Overlaps(tt.o)
+		if got != tt.want {
+			t.Errorf("Overlaps(%v, %v) = %v; want %v", tt.r, tt.o, got, tt.want)
+		}
+		got = tt.o.Overlaps(tt.r)
+		if got != tt.want {
+			t.Errorf("Overlaps(%v, %v) (reversed) = %v; want %v", tt.o, tt.r, got, tt.want)
+		}
+	}
+}
+
 func TestIPNextPrior(t *testing.T) {
 	tests := []struct {
 		ip    IP

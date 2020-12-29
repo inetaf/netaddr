@@ -968,6 +968,17 @@ func (r IPRange) Contains(addr IP) bool {
 		r.To.Compare(addr) >= 0
 }
 
+// Overlaps reports whether p and o overlap at all.
+//
+// If p and o are of different address families or either are invalid,
+// it reports false.
+func (r IPRange) Overlaps(o IPRange) bool {
+	return r.Valid() &&
+		o.Valid() &&
+		r.From.Compare(o.To) <= 0 &&
+		o.From.Compare(r.To) <= 0
+}
+
 // ip16 represents a mutable IP address, either IPv4 (in IPv6-mapped
 // form) or IPv6.
 type ip16 [16]byte
