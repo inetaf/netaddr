@@ -1152,6 +1152,9 @@ type IPSet struct {
 	out []IPRange
 }
 
+// Add adds ip to the set s.
+func (s *IPSet) Add(ip IP) { s.AddRange(IPRange{ip, ip}) }
+
 // AddPrefix adds p's range to s.
 func (s *IPSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
 
@@ -1168,6 +1171,9 @@ func (s *IPSet) AddRange(r IPRange) {
 	}
 	s.in = append(s.in, r)
 }
+
+// Remove removes ip from the set s.
+func (s *IPSet) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
 
 // RemovePrefix removes p's range from s.
 func (s *IPSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }

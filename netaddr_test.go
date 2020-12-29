@@ -1814,6 +1814,23 @@ func TestIPSet(t *testing.T) {
 				"0.0.0.22": true,
 			},
 		},
+		{
+			name: "single_ips",
+			f: func(s *IPSet) {
+				s.Add(mustIP("10.0.0.0"))
+				s.Add(mustIP("10.0.0.1"))
+				s.Add(mustIP("10.0.0.2"))
+				s.Add(mustIP("10.0.0.3"))
+				s.Add(mustIP("10.0.0.4"))
+				s.Remove(mustIP("10.0.0.4"))
+				s.Add(mustIP("10.0.0.255"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.0.0.3")},
+				{mustIP("10.0.0.255"), mustIP("10.0.0.255")},
+			},
+			wantPrefixes: pxv("10.0.0.0/30", "10.0.0.255/32"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
