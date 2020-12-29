@@ -950,6 +950,46 @@ type IPRange struct {
 	To IP
 }
 
+// ParseIPRange parses a range out of two IPs separated by a hyphen.
+//
+// It returns an error if the range is not valid.
+func ParseIPRange(s string) (IPRange, error) {
+	var r IPRange
+	h := strings.IndexByte(s, '-')
+	if h == -1 {
+		return r, fmt.Errorf("no hyphen in range %q", s)
+	}
+	from, to := s[:h], s[h+1:]
+	var err error
+	r.From, err = ParseIP(from)
+	if err != nil {
+		return r, fmt.Errorf("invalid From IP %q in range %q", from, s)
+	}
+	r.To, err = ParseIP(to)
+	if err != nil {
+		return r, fmt.Errorf("invalid To IP %q in range %q", to, s)
+	}
+	if !r.Valid() {
+		return r, fmt.Errorf("range %v to %v not valid", r.From, r.To)
+	}
+	return r, nil
+}
+
+// String returns a string representation of the range.
+//
+// For a valid range, the form is "From-To" with a single hyphen
+// separating the IPs, the same format recognized by
+// ParseIPRange.
+func (r IPRange) String() string {
+	if r.Valid() {
+		return fmt.Sprintf("%s-%s", r.From, r.To)
+	}
+	if r.From.IsZero() || r.To.IsZero() {
+		return "zero IPRange"
+	}
+	return "invalid IPRange"
+}
+
 // Valid reports whether r.From and r.To are both non-zero and obey
 // the documented requirements: address families match, and From is
 // less than or equal to To.

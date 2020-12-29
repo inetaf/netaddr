@@ -1960,6 +1960,36 @@ func TestRangePrefixes(t *testing.T) {
 	}
 }
 
+func TestParseIPRange(t *testing.T) {
+	tests := []struct {
+		in   string
+		want interface{}
+	}{
+		{"", "no hyphen in range \"\""},
+		{"1.2.3.4-5.6.7.8", IPRange{mustIP("1.2.3.4"), mustIP("5.6.7.8")}},
+		{"1.2.3.4-0.1.2.3", "range 1.2.3.4 to 0.1.2.3 not valid"},
+		{"::1-::5", IPRange{mustIP("::1"), mustIP("::5")}},
+	}
+	for _, tt := range tests {
+		r, err := ParseIPRange(tt.in)
+		var got interface{}
+		if err != nil {
+			got = err.Error()
+		} else {
+			got = r
+		}
+		if got != tt.want {
+			t.Errorf("ParseIPRange(%q) = %v; want %v", tt.in, got, tt.want)
+		}
+		if err == nil {
+			back := r.String()
+			if back != tt.in {
+				t.Errorf("input %q stringifies back as %q", tt.in, back)
+			}
+		}
+	}
+}
+
 func TestIPRangeContains(t *testing.T) {
 	type rtest struct {
 		ip   IP
