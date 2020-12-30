@@ -1110,8 +1110,9 @@ func (p IPPrefix) lastIP() IP {
 // range.
 //
 // To be valid, the From and To values be non-zero, have matching
-// address families (IPv4 vs IPv6), and From must be less than or
-// equal to To. An invalid range may be ignored.
+// address families (IPv4 vs IPv6), be in the same IPv6 zone (if any),
+// and From must be less than or equal to To.
+// An invalid range may be ignored.
 type IPRange struct {
 	// From is the initial IP address in the range.
 	From IP
@@ -1161,11 +1162,11 @@ func (r IPRange) String() string {
 }
 
 // Valid reports whether r.From and r.To are both non-zero and obey
-// the documented requirements: address families match, and From is
-// less than or equal to To.
+// the documented requirements: address families match, same IPv6
+// zone, and From is less than or equal to To.
 func (r IPRange) Valid() bool {
-	return !r.From.IsZero() && !r.To.IsZero() &&
-		r.From.Is4() == r.To.Is4() &&
+	return !r.From.IsZero() &&
+		r.From.z == r.To.z &&
 		!r.To.Less(r.From)
 }
 
