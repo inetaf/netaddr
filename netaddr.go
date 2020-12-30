@@ -41,22 +41,23 @@ const maxUint16 = 1<<16 - 1
 // Its memory representation is 24 bytes on 64-bit machines (the same
 // size as a Go slice header) for both IPv4 and IPv6 address.
 type IP struct {
-	// hi and lo are the bits of an IPv6 address. If z==z4, hi and lo
-	// contain the IPv4-mapped IPv6 address.
+	// addr are the hi (the first uint64) and lo bits (second
+	// uint64) of an IPv6 address. If z==z4, hi and lo contain the
+	// IPv4-mapped IPv6 address.
 	//
 	// hi and lo are constructed by interpreting a 16-byte IPv6
 	// address as a big-endian 128-bit number. The most significant
 	// bits of that number go into hi, the rest into lo.
 	//
 	// For example, 0011:2233:4455:6677:8899:aabb:ccdd:eeff is stored as:
-	//  hi = 0x0011223344556677
-	//  lo = 0x8899aabbccddeeff
+	//  addr[0] (hi) = 0x0011223344556677
+	//  addr[1] (lo) = 0x8899aabbccddeeff
 	//
 	// We store IPs like this, rather than as [16]byte, because it
 	// turns most operations on IPs into arithmetic and bit-twiddling
 	// operations on 64-bit registers, which is much faster than
 	// bytewise processing.
-	hi, lo uint64
+	addr uint128
 
 	// z is a combination of the address family and the IPv6 zone.
 	//
@@ -67,6 +68,9 @@ type IP struct {
 	// Otherwise it's the interned zone name string.
 	z *intern.Value
 }
+
+func (ip IP) hi() uint64 { return ip.addr[0] }
+func (ip IP) lo() uint64 { return ip.addr[1] }
 
 // z0, z4, and z6noz are sentinel IP.z values.
 // See the IP type's field docs.
@@ -86,8 +90,8 @@ func IPv6Unspecified() IP { return IP{z: z6noz} }
 // IPv4 returns the IP of the IPv4 address a.b.c.d.
 func IPv4(a, b, c, d uint8) IP {
 	return IP{
-		lo: 0xffff00000000 | uint64(a)<<24 | uint64(b)<<16 | uint64(c)<<8 | uint64(d),
-		z:  z4,
+		addr: uint128{0, 0xffff00000000 | uint64(a)<<24 | uint64(b)<<16 | uint64(c)<<8 | uint64(d)},
+		z:    z4,
 	}
 }
 
@@ -96,9 +100,11 @@ func IPv4(a, b, c, d uint8) IP {
 // address.
 func IPv6Raw(addr [16]byte) IP {
 	return IP{
-		hi: binary.BigEndian.Uint64(addr[:8]),
-		lo: binary.BigEndian.Uint64(addr[8:]),
-		z:  z6noz,
+		addr: uint128{
+			binary.BigEndian.Uint64(addr[:8]),
+			binary.BigEndian.Uint64(addr[8:]),
+		},
+		z: z6noz,
 	}
 }
 
@@ -106,9 +112,11 @@ func IPv6Raw(addr [16]byte) IP {
 // slice is 16 bytes, caller must enforce this.
 func ipv6Slice(addr []byte) IP {
 	return IP{
-		hi: binary.BigEndian.Uint64(addr[:8]),
-		lo: binary.BigEndian.Uint64(addr[8:]),
-		z:  z6noz,
+		addr: uint128{
+			binary.BigEndian.Uint64(addr[:8]),
+			binary.BigEndian.Uint64(addr[8:]),
+		},
+		z: z6noz,
 	}
 }
 
@@ -393,17 +401,13 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 // v4 returns the i'th byte of ip. If ip is not an IPv4, v4 returns
 // unspecified garbage.
 func (ip IP) v4(i uint8) uint8 {
-	return uint8(ip.lo >> ((3 - i) * 8))
+	return uint8(ip.lo() >> ((3 - i) * 8))
 }
 
 // v6 returns the i'th byte of ip. If ip is an IPv4 address, this
 // accesses the IPv4-mapped IPv6 address form of the IP.
 func (ip IP) v6(i uint8) uint8 {
-	if i >= 8 {
-		return uint8(ip.lo >> ((15 - i) * 8))
-	} else {
-		return uint8(ip.hi >> ((7 - i) * 8))
-	}
+	return uint8(ip.addr[(i/8)%2] >> ((7 - i%8) * 8))
 }
 
 // IsZero reports whether ip is the zero value of the IP type.
@@ -446,16 +450,14 @@ func (ip IP) Compare(ip2 IP) int {
 	if f1 > f2 {
 		return 1
 	}
-	if ip.hi < ip2.hi {
+	if hi1, hi2 := ip.hi(), ip2.hi(); hi1 < hi2 {
 		return -1
-	}
-	if ip.hi > ip2.hi {
+	} else if hi1 > hi2 {
 		return 1
 	}
-	if ip.lo < ip2.lo {
+	if lo1, lo2 := ip.lo(), ip2.lo(); lo1 < lo2 {
 		return -1
-	}
-	if ip.lo > ip2.lo {
+	} else if lo1 > lo2 {
 		return 1
 	}
 	if ip.Is6() {
@@ -508,7 +510,7 @@ func (ip IP) Is4() bool {
 
 // Is4in6 reports whether ip is an IPv4-mapped IPv6 address.
 func (ip IP) Is4in6() bool {
-	return ip.Is6() && ip.hi == 0 && ip.lo>>32 == 0xffff
+	return ip.Is6() && ip.hi() == 0 && ip.lo()>>32 == 0xffff
 }
 
 // Is6 reports whether ip is an IPv6 address, including IPv4-mapped
@@ -563,7 +565,7 @@ func (ip IP) IsLoopback() bool {
 		return ip.v4(0) == 127
 	}
 	if ip.Is6() {
-		return ip.hi == 0 && ip.lo == 1
+		return ip.hi() == 0 && ip.lo() == 1
 	}
 	return false // zero value
 }
@@ -600,8 +602,7 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 		}
 	}
 	mhi, mlo := mask6(effectiveBits)
-	ip.hi &= mhi
-	ip.lo &= mlo
+	ip.addr = uint128{ip.hi() & mhi, ip.lo() & mlo}
 	return IPPrefix{ip, bits}, nil
 }
 
@@ -612,8 +613,8 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 // The ip zero value returns all zeroes.
 func (ip IP) As16() [16]byte {
 	var ret [16]byte
-	binary.BigEndian.PutUint64(ret[:8], ip.hi)
-	binary.BigEndian.PutUint64(ret[8:], ip.lo)
+	binary.BigEndian.PutUint64(ret[:8], ip.hi())
+	binary.BigEndian.PutUint64(ret[8:], ip.lo())
 	return ret
 }
 
@@ -623,7 +624,7 @@ func (ip IP) As16() [16]byte {
 func (ip IP) As4() [4]byte {
 	if ip.z == z4 || ip.Is4in6() {
 		var ret [4]byte
-		binary.BigEndian.PutUint32(ret[:], uint32(ip.lo))
+		binary.BigEndian.PutUint32(ret[:], uint32(ip.lo()))
 		return ret
 	}
 	if ip.z == z0 {
@@ -996,10 +997,10 @@ func (p IPPrefix) Contains(addr IP) bool {
 	}
 	if addr.Is4() {
 		m := mask4(p.Bits)
-		return uint32(addr.lo)&m == uint32(p.IP.lo)&m
+		return uint32(addr.lo())&m == uint32(p.IP.lo())&m
 	} else {
 		mhi, mlo := mask6(p.Bits)
-		return addr.hi&mhi == p.IP.hi&mhi && addr.lo&mlo == p.IP.lo&mlo
+		return addr.hi()&mhi == p.IP.hi()&mhi && addr.lo()&mlo == p.IP.lo()&mlo
 	}
 }
 
@@ -1185,52 +1186,54 @@ func (r IPRange) Overlaps(o IPRange) bool {
 		o.From.Compare(r.To) <= 0
 }
 
-// ip16 represents a mutable IP address, either IPv4 (in IPv6-mapped
-// form) or IPv6.
-//
-// TODO(bradfitz): ditch this type now and fold into IP? Not used much.
-type ip16 [16]byte
+// uint128 represents a uint128 using two uint64s.
+// Index 0 contains the high bits, index 1 contains the low.
+type uint128 [2]uint64
 
 // bitSet reports whether the given bit in the address is set.
 // (bit 0 is the most significant bit in ip[0]; bit 127 is last)
-func (ip ip16) bitSet(bit uint8) bool {
-	i, s := bit/8, 7-(bit%8)
-	return ip[i]&(1<<s) != 0
+// Results undefined for invalid bit numbers.
+func (u uint128) bitSet(bit uint8) bool {
+	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
+	s := 63 - (bit % 64)
+	return u[hli]&(1<<s) != 0
 }
 
-func (ip *ip16) set(bit uint8) {
-	i, s := bit/8, 7-(bit%8)
-	ip[i] |= 1 << s
+func (u *uint128) set(bit uint8) {
+	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
+	s := 63 - (bit % 64)
+	u[hli] |= 1 << s
 }
 
-func (ip *ip16) clear(bit uint8) {
-	i, s := bit/8, 7-(bit%8)
-	ip[i] &^= 1 << s
+func (u *uint128) clear(bit uint8) {
+	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
+	s := 63 - (bit % 64)
+	u[hli] &^= 1 << s
 }
 
-// lastWithBitZero returns a copy of ip with the given bit
+// lastWithBitZero returns a copy of u with the given bit
 // cleared and the following all set.
-func (ip ip16) lastWithBitZero(bit uint8) ip16 {
-	ip.clear(bit)
+func (u uint128) lastWithBitZero(bit uint8) uint128 {
+	u.clear(bit)
 	for ; bit < 128; bit++ {
-		ip.set(bit)
+		u.set(bit)
 	}
-	return ip
+	return u
 }
 
 // firstWithBitOne returns a copy of ip with the given bit
 // set and the following all cleared.
-func (ip ip16) firstWithBitOne(bit uint8) ip16 {
-	ip.set(bit)
+func (u uint128) firstWithBitOne(bit uint8) uint128 {
+	u.set(bit)
 	for ; bit < 128; bit++ {
-		ip.clear(bit)
+		u.clear(bit)
 	}
-	return ip
+	return u
 }
 
-// prefixMaker returns a address-family-corrected IPPrefix from ip16 and bits,
+// prefixMaker returns a address-family-corrected IPPrefix from a and bits,
 // where the input bits is always in the IPv6-mapped form for IPv4 addresses.
-type prefixMaker func(ip16 ip16, bits uint8) IPPrefix
+type prefixMaker func(a uint128, bits uint8) IPPrefix
 
 // Prefixes returns the set of IPPrefix entries that covers r.
 //
@@ -1240,36 +1243,35 @@ func (r IPRange) Prefixes() []IPPrefix {
 	if !r.Valid() {
 		return nil
 	}
-	a16, b16 := ip16(r.From.As16()), ip16(r.To.As16())
-	return appendRangePrefixes(nil, r.prefixMaker(), a16, b16)
+	return appendRangePrefixes(nil, r.prefixMaker(), r.From.addr, r.To.addr)
 }
 
 func (r IPRange) prefixMaker() prefixMaker {
 	if r.From.Is4() {
-		return func(ip16 ip16, bits uint8) IPPrefix {
-			return IPPrefix{IPFrom16([16]byte(ip16)), bits - 12*8}
+		return func(a uint128, bits uint8) IPPrefix {
+			return IPPrefix{IP{addr: a, z: z4}, bits - 12*8}
 		}
 	}
-	return func(ip16 ip16, bits uint8) IPPrefix {
-		return IPPrefix{IPv6Raw([16]byte(ip16)), bits}
+	return func(a uint128, bits uint8) IPPrefix {
+		return IPPrefix{IP{addr: a, z: z6noz}, bits}
 	}
 }
 
-func comparePrefixes(a16, b16 ip16) (common uint8, aAllZero, bAllSet bool) {
-	for common < 128 && a16.bitSet(common) == b16.bitSet(common) {
+func comparePrefixes(a, b uint128) (common uint8, aAllZero, bAllSet bool) {
+	for common < 128 && a.bitSet(common) == b.bitSet(common) {
 		common++
 	}
-	// See whether a16 and b16, after their common shared bits, end
+	// See whether a and b, after their common shared bits, end
 	// in all zero bits or all one bits, respectively.
 	aAllZero, bAllSet = true, true
 	for i := common; i < 128; i++ {
-		if a16.bitSet(i) {
+		if a.bitSet(i) {
 			aAllZero = false
 			break
 		}
 	}
 	for i := common; i < 128; i++ {
-		if !b16.bitSet(i) {
+		if !b.bitSet(i) {
 			bAllSet = false
 			break
 		}
@@ -1283,23 +1285,22 @@ func (r IPRange) Prefix() (p IPPrefix, ok bool) {
 	if !r.Valid() {
 		return
 	}
-	a16, b16 := ip16(r.From.As16()), ip16(r.To.As16())
-	if common, aAllZero, bAllSet := comparePrefixes(a16, b16); aAllZero && bAllSet {
-		return r.prefixMaker()(a16, common), true
+	if common, aAllZero, bAllSet := comparePrefixes(r.From.addr, r.To.addr); aAllZero && bAllSet {
+		return r.prefixMaker()(r.From.addr, common), true
 	}
 	return
 }
 
-func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a16, b16 ip16) []IPPrefix {
-	common, aAllZero, bAllSet := comparePrefixes(a16, b16)
+func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) []IPPrefix {
+	common, aAllZero, bAllSet := comparePrefixes(a, b)
 	if aAllZero && bAllSet {
 		// a16 to b16 represents a whole range, like 10.50.0.0/16.
 		// (a16 being 10.50.0.0 and b16 being 10.50.255.255)
-		return append(dst, makePrefix(a16, common))
+		return append(dst, makePrefix(a, common))
 	}
 	// Otherwise recursively do both halves.
-	dst = appendRangePrefixes(dst, makePrefix, a16, a16.lastWithBitZero(common+1))
-	dst = appendRangePrefixes(dst, makePrefix, b16.firstWithBitOne(common+1), b16)
+	dst = appendRangePrefixes(dst, makePrefix, a, a.lastWithBitZero(common+1))
+	dst = appendRangePrefixes(dst, makePrefix, b.firstWithBitOne(common+1), b)
 	return dst
 }
 

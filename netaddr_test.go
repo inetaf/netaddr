@@ -31,90 +31,90 @@ func TestParseIP(t *testing.T) {
 		// Basic zero IPv4 address.
 		{
 			in:     "0.0.0.0",
-			ip:     IP{0, 0xffff00000000, z4},
+			ip:     IP{uint128{0, 0xffff00000000}, z4},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("0.0.0.0")},
 		},
 		// Basic non-zero IPv4 address.
 		{
 			in:     "192.168.140.255",
-			ip:     IP{0, 0xffffc0a88cff, z4},
+			ip:     IP{uint128{0, 0xffffc0a88cff}, z4},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("192.168.140.255")},
 		},
 		// IPv4 address in windows-style "print all the digits" form.
 		{
 			in:     "010.000.015.001",
-			ip:     IP{0, 0xffff0a000f01, z4},
+			ip:     IP{uint128{0, 0xffff0a000f01}, z4},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("10.0.15.1")},
 			str:    "10.0.15.1",
 		},
 		// IPv4 address with a silly amount of leading zeros.
 		{
 			in:     "000001.00000002.00000003.000000004",
-			ip:     IP{0, 0xffff01020304, z4},
+			ip:     IP{uint128{0, 0xffff01020304}, z4},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("1.2.3.4")},
 			str:    "1.2.3.4",
 		},
 		// Basic zero IPv6 address.
 		{
 			in:     "::",
-			ip:     IP{0, 0, z6noz},
+			ip:     IP{uint128{}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("::")},
 		},
 		// Localhost IPv6.
 		{
 			in:     "::1",
-			ip:     IP{0, 1, z6noz},
+			ip:     IP{uint128{0, 1}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("::1")},
 		},
 		// Fully expanded IPv6 address.
 		{
 			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b:430b",
-			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b430b, z6noz},
+			ip:     IP{uint128{0xfd7a115ca1e0ab12, 0x4843cd96626b430b}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b:430b")},
 		},
 		// IPv6 with elided fields in the middle.
 		{
 			in:     "fd7a:115c::626b:430b",
-			ip:     IP{0xfd7a115c00000000, 0x00000000626b430b, z6noz},
+			ip:     IP{uint128{0xfd7a115c00000000, 0x00000000626b430b}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c::626b:430b")},
 		},
 		// IPv6 with elided fields at the end.
 		{
 			in:     "fd7a:115c:a1e0:ab12:4843:cd96::",
-			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd9600000000, z6noz},
+			ip:     IP{uint128{0xfd7a115ca1e0ab12, 0x4843cd9600000000}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96::")},
 		},
 		// IPv6 with single elided field at the end.
 		{
 			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b::",
-			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b0000, z6noz},
+			ip:     IP{uint128{0xfd7a115ca1e0ab12, 0x4843cd96626b0000}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b::")},
 			str:    "fd7a:115c:a1e0:ab12:4843:cd96:626b:0",
 		},
 		// IPv6 with single elided field in the middle.
 		{
 			in:     "fd7a:115c:a1e0::4843:cd96:626b:430b",
-			ip:     IP{0xfd7a115ca1e00000, 0x4843cd96626b430b, z6noz},
+			ip:     IP{uint128{0xfd7a115ca1e00000, 0x4843cd96626b430b}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0::4843:cd96:626b:430b")},
 			str:    "fd7a:115c:a1e0:0:4843:cd96:626b:430b",
 		},
 		// IPv6 with the trailing 32 bits written as IPv4 dotted decimal.
 		{
 			in:     "::ffff:192.168.140.255",
-			ip:     IP{0, 0x0000ffffc0a88cff, z6noz},
+			ip:     IP{uint128{0, 0x0000ffffc0a88cff}, z6noz},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("::ffff:192.168.140.255")},
 			str:    "::ffff:c0a8:8cff",
 		},
 		// IPv6 with a zone specifier.
 		{
 			in:     "fd7a:115c:a1e0:ab12:4843:cd96:626b:430b%eth0",
-			ip:     IP{0xfd7a115ca1e0ab12, 0x4843cd96626b430b, intern.Get("eth0")},
+			ip:     IP{uint128{0xfd7a115ca1e0ab12, 0x4843cd96626b430b}, intern.Get("eth0")},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("fd7a:115c:a1e0:ab12:4843:cd96:626b:430b"), Zone: "eth0"},
 		},
 		// IPv6 with dotted decimal and zone specifier.
 		{
 			in:     "1:2::ffff:192.168.140.255%eth1",
-			ip:     IP{0x0001000200000000, 0x0000ffffc0a88cff, intern.Get("eth1")},
+			ip:     IP{uint128{0x0001000200000000, 0x0000ffffc0a88cff}, intern.Get("eth1")},
 			ipaddr: &net.IPAddr{IP: net.ParseIP("1:2::ffff:192.168.140.255"), Zone: "eth1"},
 			str:    "1:2::ffff:c0a8:8cff%eth1",
 		},
@@ -378,19 +378,19 @@ func TestIPFrom16AndIPv6Raw(t *testing.T) {
 			name: "v6-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{15: 1},
-			want: IP{z: z6noz, lo: 1},
+			want: IP{z: z6noz, addr: uint128{0, 1}},
 		},
 		{
 			name: "v6-from16",
 			fn:   IPFrom16,
 			in:   [...]byte{15: 1},
-			want: IP{z: z6noz, lo: 1},
+			want: IP{z: z6noz, addr: uint128{0, 1}},
 		},
 		{
 			name: "v4-raw",
 			fn:   IPv6Raw,
 			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
-			want: IP{z: z6noz, lo: 0xffff01020304},
+			want: IP{z: z6noz, addr: uint128{0, 0xffff01020304}},
 		},
 		{
 			name: "v4-from16",
@@ -2620,6 +2620,48 @@ func TestPointLess(t *testing.T) {
 		}
 	}
 
+}
+
+func TestUint128(t *testing.T) {
+	randU128 := func() (uint128, string) {
+		var a [16]byte
+		rand.Read(a[:])
+		u := ipv6Slice(a[:]).addr
+		return u, fmt.Sprintf("%064b%064b", u[0], u[1])
+	}
+
+	u128, bitStr := randU128()
+	for bit := uint8(0); bit < 128; bit++ {
+		set, want := u128.bitSet(bit), bitStr[bit] == '1'
+		if set != want {
+			t.Fatalf("bitSet(%d) wrong", bit)
+		}
+	}
+	for bit := uint8(0); bit < 128; bit++ {
+		set := u128.bitSet(bit)
+		if set {
+			u128.clear(bit)
+		} else {
+			u128.set(bit)
+		}
+		newSet := u128.bitSet(bit)
+		if newSet == set {
+			t.Fatalf("bit(%d) set/clear from %v to %v failed", bit, set, !set)
+		}
+	}
+}
+
+func TestIPv6Accessor(t *testing.T) {
+	var a [16]byte
+	for i := range a {
+		a[i] = uint8(i) + 1
+	}
+	ip := IPv6Raw(a)
+	for i := range a {
+		if got, want := ip.v6(uint8(i)), uint8(i)+1; got != want {
+			t.Errorf("v6(%v) = %v; want %v", i, got, want)
+		}
+	}
 }
 
 // Sink variables are here to force the compiler to not elide
