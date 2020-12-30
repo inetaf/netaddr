@@ -2202,6 +2202,28 @@ func TestIPRangeOverlaps(t *testing.T) {
 	}
 }
 
+func TestIPRangeValid(t *testing.T) {
+	tests := []struct {
+		r    IPRange
+		want bool
+	}{
+		{IPRange{mustIP("10.0.0.0"), mustIP("10.0.0.255")}, true},
+		{IPRange{mustIP("::1"), mustIP("::2")}, true},
+		{IPRange{mustIP("::1%foo"), mustIP("::2%foo")}, true},
+
+		{IPRange{mustIP("::1%foo"), mustIP("::2%bar")}, false}, // zones differ
+		{IPRange{IP{}, IP{}}, false},                           // zero values
+		{IPRange{mustIP("::2"), mustIP("::1")}, false},         // bad order
+		{IPRange{mustIP("1.2.3.4"), mustIP("::1")}, false},     // family mismatch
+	}
+	for _, tt := range tests {
+		got := tt.r.Valid()
+		if got != tt.want {
+			t.Errorf("range %v to %v Valid = %v; want %v", tt.r.From, tt.r.To, got, tt.want)
+		}
+	}
+}
+
 func TestIPRangePrefix(t *testing.T) {
 	tests := []struct {
 		r    IPRange
