@@ -2232,6 +2232,16 @@ func TestIPRangePrefix(t *testing.T) {
 	}
 }
 
+func BenchmarkIPRangePrefix(b *testing.B) {
+	b.ReportAllocs()
+	r := IPRange{mustIP("10.0.0.0"), mustIP("10.0.0.255")}
+	for i := 0; i < b.N; i++ {
+		if _, ok := r.Prefix(); !ok {
+			b.Fatal("expected a prefix")
+		}
+	}
+}
+
 func TestIPNextPrior(t *testing.T) {
 	tests := []struct {
 		ip    IP

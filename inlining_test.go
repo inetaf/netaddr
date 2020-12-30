@@ -70,6 +70,8 @@ func TestInlining(t *testing.T) {
 		"IPPrefix.IsZero",
 		"IPPrefix.Masked",
 		"IPPrefix.String",
+		"IPRange.prefixFrom128AndBits",
+		"IPRange.prefixFrom128AndBits-fm",
 		"IPv4",
 		"IPv6LinkLocalAllNodes",
 		"IPv6Unspecified",
@@ -82,6 +84,8 @@ func TestInlining(t *testing.T) {
 		"mask6",
 		"uint128.and",
 		"uint128.bitSet",
+		"uint128.or",
+		"uint128.xor",
 	} {
 		if !got[want] {
 			t.Errorf("%q is no longer inlinable", want)
