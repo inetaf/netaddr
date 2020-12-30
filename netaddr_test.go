@@ -1249,6 +1249,7 @@ func TestParseIPPort(t *testing.T) {
 		{in: "1.1.1.1:123456", wantErr: true},
 		{in: "1.1.1.1:-123", wantErr: true},
 		{in: "[::1]:1234", want: IPPort{mustIP("::1"), 1234}},
+		{in: "fe80::1:1234", wantErr: true},
 		{in: ":0", wantErr: true}, // if we need to parse this form, there should be a separate function that explicitly allows it
 	}
 	for _, test := range tests {
@@ -1539,6 +1540,24 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 
 			for i := 0; i < b.N; i++ {
 				sinkIPPrefix, _ = tt.ip.Prefix(tt.bits)
+			}
+		})
+	}
+}
+
+func BenchmarkParseIPPort(b *testing.B) {
+	for _, test := range parseBenchInputs {
+		var ipp string
+		if strings.HasPrefix(test.ip, "v6") {
+			ipp = fmt.Sprintf("[%s]:1234", test.ip)
+		} else {
+			ipp = fmt.Sprintf("%s:1234", test.ip)
+		}
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+
+			for i := 0; i < b.N; i++ {
+				sinkIPPort, _ = ParseIPPort(ipp)
 			}
 		})
 	}
