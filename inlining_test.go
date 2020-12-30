@@ -44,8 +44,8 @@ func TestInlining(t *testing.T) {
 		"(*IPSet).Add",
 		"(*IPSet).Remove",
 		"(*IPSet).RemoveRange",
-		"(*ip16).clear",
-		"(*ip16).set",
+		"(*uint128).clear",
+		"(*uint128).set",
 		"IP.BitLen",
 		"IP.IPAddr",
 		"IP.Is4",
@@ -58,6 +58,8 @@ func TestInlining(t *testing.T) {
 		"IP.MarshalText",
 		"IP.Unmap",
 		"IP.Zone",
+		"IP.hi",
+		"IP.lo",
 		"IP.v4",
 		"IP.v6",
 		"IP.withInternedZone",
@@ -76,9 +78,9 @@ func TestInlining(t *testing.T) {
 		"MustParseIPPrefix",
 		"PutUDPAddr",
 		"discardf",
-		"ip16.bitSet",
 		"mask4",
 		"mask6",
+		"uint128.bitSet",
 	} {
 		if !got[want] {
 			t.Errorf("%q is no longer inlinable", want)
