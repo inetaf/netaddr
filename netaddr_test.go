@@ -2727,6 +2727,8 @@ func TestNoAllocs(t *testing.T) {
 	})
 	test("IP.Is4", func() { sinkBool = MustParseIP("1.2.3.4").Is4() })
 	test("IP.Is6", func() { sinkBool = MustParseIP("fe80::1").Is6() })
+	test("IP.Is4in6", func() { sinkBool = MustParseIP("fe80::1").Is4in6() })
+	test("IP.Unmap", func() { sinkIP = MustParseIP("ffff::2.3.4.5").Unmap() })
 	test("IP.WithZone", func() { sinkIP = MustParseIP("fe80::1").WithZone("") })
 	test("IP.IsLinkLocalUnicast", func() { sinkBool = MustParseIP("fe80::1").IsLinkLocalUnicast() })
 	test("IP.IsLoopback", func() { sinkBool = MustParseIP("fe80::1").IsLoopback() })
