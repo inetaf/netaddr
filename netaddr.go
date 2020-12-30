@@ -1412,6 +1412,38 @@ func (s *IPSet) AddRange(r IPRange) {
 // Remove removes ip from the set s.
 func (s *IPSet) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
 
+// RemoveFreePrefix removes and returns a Prefix of length bits from the IPSet.
+func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, ok bool) {
+	prefixes := s.Prefixes()
+	if len(prefixes) == 0 {
+		return IPPrefix{}, false
+	}
+	existingPrefixes := make(map[uint8]IPPrefix)
+	for _, prefix := range prefixes {
+		existingPrefixes[prefix.Bits] = prefix
+	}
+	exactMatch, ok := existingPrefixes[bitLen]
+	if ok {
+		s.RemovePrefix(exactMatch)
+		return exactMatch, true
+	}
+
+	nextBiggerPrefix, ok := existingPrefixes[bitLen-1]
+	if !ok {
+		if len(prefixes) < 1 {
+			return IPPrefix{}, false
+		}
+		pfx := prefixes[0]
+		prefix := IPPrefix{IP: pfx.IP, Bits: bitLen}
+		s.RemovePrefix(prefix)
+		return prefix, true
+	}
+
+	prefix := IPPrefix{IP: nextBiggerPrefix.IP, Bits: bitLen}
+	s.RemovePrefix(prefix)
+	return prefix, true
+}
+
 // RemovePrefix removes p's range from s.
 func (s *IPSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
 
