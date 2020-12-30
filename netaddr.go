@@ -786,18 +786,10 @@ func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
 //
 // UDPAddr necessarily does two allocations. If you have an existing
 // UDPAddr already allocated, see UDPAddrReuse.
-func (p IPPort) UDPAddr() *net.UDPAddr {
-	ret := &net.UDPAddr{
-		Port: int(p.Port),
+func (p IPPort) UDPAddr(reuse *net.UDPAddr) *net.UDPAddr {
+	if reuse == nil {
+		reuse = &net.UDPAddr{}
 	}
-	ret.IP, ret.Zone = p.IP.ipZone(nil)
-	return ret
-}
-
-// UDPAddrReuse is like UDPAddr, but reuses the provided UDPAddr,
-// which must be non-nil. If reuse.IP has a capacity of 16,
-// UDPAddrReuse is allocation-free.
-func (p IPPort) UDPAddrReuse(reuse *net.UDPAddr) *net.UDPAddr {
 	reuse.Port = int(p.Port)
 	reuse.IP, reuse.Zone = p.IP.ipZone(reuse.IP)
 	return reuse

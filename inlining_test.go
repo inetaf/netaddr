@@ -65,7 +65,6 @@ func TestInlining(t *testing.T) {
 		"IPPort.MarshalText",
 		"IPPort.TCPAddr",
 		"IPPort.UDPAddr",
-		"IPPort.UDPAddrReuse",
 		"IPPrefix.IsSingleIP",
 		"IPPrefix.IsZero",
 		"IPPrefix.Masked",

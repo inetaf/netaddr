@@ -1334,7 +1334,7 @@ func TestUDPAddrAllocs(t *testing.T) {
 		}
 		ua := &net.UDPAddr{IP: make(net.IP, 0, 16)}
 		n := int(testing.AllocsPerRun(1000, func() {
-			ua := ipp.UDPAddrReuse(ua)
+			ua := ipp.UDPAddr(ua)
 			if ua.Port != int(ipp.Port) {
 				t.Fatal("UDPAddr returned bogus result")
 			}
@@ -2663,7 +2663,7 @@ func TestNoAllocs(t *testing.T) {
 	})
 
 	// IPPort methods
-	test("UDPAddrReuse", func() { sinkUDPAddr = MustParseIPPort("1.2.3.4:1234").UDPAddrReuse(sinkUDPAddr) })
+	test("UDPAddrReuse", func() { sinkUDPAddr = MustParseIPPort("1.2.3.4:1234").UDPAddr(sinkUDPAddr) })
 
 	// IPPrefix constructors
 	test("ParseIPPrefix/4", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("1.2.3.4/20")) })
