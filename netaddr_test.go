@@ -2542,15 +2542,71 @@ func TestPointLess(t *testing.T) {
 
 }
 
+// Sink variables are here to force the compiler to not elide
+// seemingly useless work in benchmarks and allocation tests. If you
+// were to just `_ = foo()` within a test function, the compiler could
+// correctly deduce that foo() does nothing and doesn't need to be
+// called. By writing results to a global variable, we hide that fact
+// from the compiler and force it to keep the code under test.
 var (
-	sinkIP          IP
-	sinkStdIP       net.IP
-	sinkIPPort      IPPort
-	sinkIPPrefix    IPPrefix
-	sinkInternValue *intern.Value
+	sinkIP            IP
+	sinkStdIP         net.IP
+	sinkIPPort        IPPort
+	sinkIPPrefix      IPPrefix
+	sinkIPPrefixSlice []IPPrefix
+	sinkIPRange       IPRange
+	sinkInternValue   *intern.Value
+	sinkIP16          [16]byte
+	sinkIP4           [4]byte
+	sinkBool          bool
 )
 
 func TestNoAllocs(t *testing.T) {
+	// Wrappers that panic on error, to prove that our alloc-free
+	// methods are returning successfully.
+	panicIP := func(ip IP, err error) IP {
+		if err != nil {
+			panic(err)
+		}
+		return ip
+	}
+	panicIPOK := func(ip IP, ok bool) IP {
+		if !ok {
+			panic("not ok")
+		}
+		return ip
+	}
+	panicPfx := func(pfx IPPrefix, err error) IPPrefix {
+		if err != nil {
+			panic(err)
+		}
+		return pfx
+	}
+	panicPfxOK := func(pfx IPPrefix, ok bool) IPPrefix {
+		if !ok {
+			panic("not ok")
+		}
+		return pfx
+	}
+	panicIPP := func(ipp IPPort, err error) IPPort {
+		if err != nil {
+			panic(err)
+		}
+		return ipp
+	}
+	panicIPPOK := func(ipp IPPort, ok bool) IPPort {
+		if !ok {
+			panic("not ok")
+		}
+		return ipp
+	}
+	panicIPR := func(ipr IPRange, err error) IPRange {
+		if err != nil {
+			panic(err)
+		}
+		return ipr
+	}
+
 	test := func(name string, f func()) {
 		t.Run(name, func(t *testing.T) {
 			n := testing.AllocsPerRun(1000, f)
@@ -2559,9 +2615,63 @@ func TestNoAllocs(t *testing.T) {
 			}
 		})
 	}
+
+	// IP constructors
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
 	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
-	test("ParseIP_4", func() { sinkIP, _ = ParseIP("1.2.3.4") })
-	test("ParseIP_6", func() { sinkIP, _ = ParseIP("::1") })
-	test("ParseIPPort", func() { sinkIPPort, _ = ParseIPPort("[::1]:1234") })
+	test("IPFrom16", func() { sinkIP = IPFrom16([16]byte{15: 1}) })
+	test("ParseIP/4", func() { sinkIP = panicIP(ParseIP("1.2.3.4")) })
+	test("ParseIP/6", func() { sinkIP = panicIP(ParseIP("::1")) })
+	test("MustParseIP", func() { sinkIP = MustParseIP("1.2.3.4") })
+	test("FromStdIP", func() { sinkIP = panicIPOK(FromStdIP(net.IP([]byte{1, 2, 3, 4}))) })
+	test("FromStdIPRaw", func() { sinkIP = panicIPOK(FromStdIPRaw(net.IP([]byte{1, 2, 3, 4}))) })
+
+	// IP methods
+	test("IP.Prefix/4", func() { sinkIPPrefix = panicPfx(MustParseIP("1.2.3.4").Prefix(20)) })
+	test("IP.Prefix/6", func() { sinkIPPrefix = panicPfx(MustParseIP("fe80::1").Prefix(64)) })
+	test("IP.As16", func() { sinkIP16 = MustParseIP("1.2.3.4").As16() })
+	test("IP.As4", func() { sinkIP4 = MustParseIP("1.2.3.4").As4() })
+	test("IP.Next", func() { sinkIP = MustParseIP("1.2.3.4").Next() })
+	test("IP.Prior", func() { sinkIP = MustParseIP("1.2.3.4").Prior() })
+
+	// IPPort constructors
+	test("ParseIPPort", func() { sinkIPPort = panicIPP(ParseIPPort("[::1]:1234")) })
+	test("MustParseIPPort", func() { sinkIPPort = MustParseIPPort("[::1]:1234") })
+	test("FromStdAddr", func() {
+		std := net.IP{1, 2, 3, 4}
+		sinkIPPort = panicIPPOK(FromStdAddr(std, 5678, ""))
+	})
+
+	// IPPrefix constructors
+	test("ParseIPPrefix/4", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("1.2.3.4/20")) })
+	test("ParseIPPrefix/6", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("fe80::1/64")) })
+	test("FromStdIPNet", func() {
+		std := &net.IPNet{
+			IP:   net.IP{1, 2, 3, 4},
+			Mask: net.IPMask{255, 255, 0, 0},
+		}
+		sinkIPPrefix = panicPfxOK(FromStdIPNet(std))
+	})
+
+	// IPPrefix methods
+	test("IPPrefix.Contains", func() { sinkBool = MustParseIPPrefix("1.2.3.0/24").Contains(MustParseIP("1.2.3.4")) })
+	test("IPPrefix.Overlaps", func() {
+		a, b := MustParseIPPrefix("1.2.3.0/24"), MustParseIPPrefix("1.2.0.0/16")
+		sinkBool = a.Overlaps(b)
+	})
+
+	// IPRange constructors
+	test("ParseIPRange", func() { sinkIPRange = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")) })
+
+	// IPRange methods
+	test("IPRange.Valid", func() { sinkBool = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")).Valid() })
+	test("IPRange.Overlaps", func() {
+		a := panicIPR(ParseIPRange("1.2.3.0-1.2.3.150"))
+		b := panicIPR(ParseIPRange("1.2.4.0-1.2.4.255"))
+		sinkBool = a.Overlaps(b)
+	})
+	test("IPRange.Prefix", func() {
+		a := panicIPR(ParseIPRange("1.2.3.0-1.2.3.255"))
+		sinkIPPrefix = panicPfxOK(a.Prefix())
+	})
 }
