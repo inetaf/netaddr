@@ -2645,8 +2645,31 @@ func TestNoAllocs(t *testing.T) {
 	test("MustParseIP", func() { sinkIP = MustParseIP("1.2.3.4") })
 	test("FromStdIP", func() { sinkIP = panicIPOK(FromStdIP(net.IP([]byte{1, 2, 3, 4}))) })
 	test("FromStdIPRaw", func() { sinkIP = panicIPOK(FromStdIPRaw(net.IP([]byte{1, 2, 3, 4}))) })
+	test("IPv6LinkLocalAllNodes", func() { sinkIP = IPv6LinkLocalAllNodes() })
+	test("IPv6Unspecified", func() { sinkIP = IPv6Unspecified() })
 
 	// IP methods
+	test("IP.IsZero", func() { sinkBool = MustParseIP("1.2.3.4").IsZero() })
+	test("IP.BitLen", func() { sinkBool = MustParseIP("1.2.3.4").BitLen() == 8 })
+	test("IP.Zone/4", func() { sinkBool = MustParseIP("1.2.3.4").Zone() == "" })
+	test("IP.Zone/6", func() { sinkBool = MustParseIP("fe80::1").Zone() == "" })
+	// No IP.Zone/6+zone, because that does allocate currently.
+	test("IP.Compare", func() {
+		a := MustParseIP("1.2.3.4")
+		b := MustParseIP("2.3.4.5")
+		sinkBool = a.Compare(b) == 0
+	})
+	test("IP.Less", func() {
+		a := MustParseIP("1.2.3.4")
+		b := MustParseIP("2.3.4.5")
+		sinkBool = a.Less(b)
+	})
+	test("IP.Is4", func() { sinkBool = MustParseIP("1.2.3.4").Is4() })
+	test("IP.Is6", func() { sinkBool = MustParseIP("fe80::1").Is6() })
+	test("IP.WithZone", func() { sinkIP = MustParseIP("fe80::1").WithZone("") })
+	test("IP.IsLinkLocalUnicast", func() { sinkBool = MustParseIP("fe80::1").IsLinkLocalUnicast() })
+	test("IP.IsLoopback", func() { sinkBool = MustParseIP("fe80::1").IsLoopback() })
+	test("IP.IsMulticast", func() { sinkBool = MustParseIP("fe80::1").IsMulticast() })
 	test("IP.Prefix/4", func() { sinkIPPrefix = panicPfx(MustParseIP("1.2.3.4").Prefix(20)) })
 	test("IP.Prefix/6", func() { sinkIPPrefix = panicPfx(MustParseIP("fe80::1").Prefix(64)) })
 	test("IP.As16", func() { sinkIP16 = MustParseIP("1.2.3.4").As16() })
@@ -2665,6 +2688,7 @@ func TestNoAllocs(t *testing.T) {
 	// IPPrefix constructors
 	test("ParseIPPrefix/4", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("1.2.3.4/20")) })
 	test("ParseIPPrefix/6", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("fe80::1/64")) })
+	test("MustParseIPPrefix", func() { sinkIPPrefix = MustParseIPPrefix("1.2.3.4/20") })
 	test("FromStdIPNet", func() {
 		std := &net.IPNet{
 			IP:   net.IP{1, 2, 3, 4},
@@ -2679,6 +2703,10 @@ func TestNoAllocs(t *testing.T) {
 		a, b := MustParseIPPrefix("1.2.3.0/24"), MustParseIPPrefix("1.2.0.0/16")
 		sinkBool = a.Overlaps(b)
 	})
+	test("IPPrefix.IsZero", func() { sinkBool = MustParseIPPrefix("1.2.0.0/16").IsZero() })
+	test("IPPrefix.IsSingleIP", func() { sinkBool = MustParseIPPrefix("1.2.3.4/32").IsSingleIP() })
+	test("IPPRefix.Masked", func() { sinkIPPrefix = MustParseIPPrefix("1.2.3.4/16").Masked() })
+	test("IPPRefix.Range", func() { sinkIPRange = MustParseIPPrefix("1.2.3.4/16").Range() })
 
 	// IPRange constructors
 	test("ParseIPRange", func() { sinkIPRange = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")) })
