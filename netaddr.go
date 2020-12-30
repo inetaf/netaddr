@@ -694,12 +694,41 @@ type IPPort struct {
 	Port uint16
 }
 
+// splitIPPort splits s into an IP address string and a port
+// string. It splits strings shaped like "foo:bar" or "[foo]:bar",
+// without further validating the substrings. v6 indicates whether the
+// ip string should parse as an IPv6 address or an IPv4 address, in
+// order for s to be a valid ip:port string.
+func splitIPPort(s string) (ip, port string, v6 bool, err error) {
+	i := strings.LastIndexByte(s, ':')
+	if i == -1 {
+		return "", "", false, errors.New("not an ip:port")
+	}
+
+	ip, port = s[:i], s[i+1:]
+	if len(ip) == 0 {
+		return "", "", false, errors.New("no IP")
+	}
+	if len(port) == 0 {
+		return "", "", false, errors.New("no port")
+	}
+	if ip[0] == '[' {
+		if len(ip) < 2 || ip[len(ip)-1] != ']' {
+			return "", "", false, errors.New("missing ]")
+		}
+		ip = ip[1:len(ip)-1]
+		v6 = true
+	}
+
+	return ip, port, v6, nil
+}
+
 // ParseIPPort parses s as an IPPort.
 //
 // It doesn't do any name resolution, and ports must be numeric.
 func ParseIPPort(s string) (IPPort, error) {
 	var ipp IPPort
-	ip, port, err := net.SplitHostPort(s)
+	ip, port, v6, err := splitIPPort(s)
 	if err != nil {
 		return ipp, err
 	}
@@ -711,6 +740,11 @@ func ParseIPPort(s string) (IPPort, error) {
 	ipp.IP, err = ParseIP(ip)
 	if err != nil {
 		return IPPort{}, err
+	}
+	if v6 && ipp.IP.Is4() {
+		return IPPort{}, fmt.Errorf("invalid ip:port %q, square brackets can only be used with IPv6 addresses", s)
+	} else if !v6 && ipp.IP.Is6() {
+		return IPPort{}, fmt.Errorf("invalid ip:port %q, IPv6 addresses must be surrounded by square brackets", s)
 	}
 	return ipp, nil
 }

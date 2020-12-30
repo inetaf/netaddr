@@ -1249,6 +1249,7 @@ func TestParseIPPort(t *testing.T) {
 		{in: "1.1.1.1:123456", wantErr: true},
 		{in: "1.1.1.1:-123", wantErr: true},
 		{in: "[::1]:1234", want: IPPort{mustIP("::1"), 1234}},
+		{in: "[1.2.3.4]:1234", wantErr: true},
 		{in: "fe80::1:1234", wantErr: true},
 		{in: ":0", wantErr: true}, // if we need to parse this form, there should be a separate function that explicitly allows it
 	}
