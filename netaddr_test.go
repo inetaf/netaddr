@@ -1548,7 +1548,7 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 func BenchmarkParseIPPort(b *testing.B) {
 	for _, test := range parseBenchInputs {
 		var ipp string
-		if strings.HasPrefix(test.ip, "v6") {
+		if strings.HasPrefix(test.name, "v6") {
 			ipp = fmt.Sprintf("[%s]:1234", test.ip)
 		} else {
 			ipp = fmt.Sprintf("%s:1234", test.ip)
