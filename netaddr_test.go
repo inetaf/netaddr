@@ -1482,6 +1482,18 @@ func BenchmarkStdParseIP(b *testing.B) {
 	}
 }
 
+func BenchmarkIPString(b *testing.B) {
+	for _, test := range parseBenchInputs {
+		ip := MustParseIP(test.ip)
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				sinkString = ip.String()
+			}
+		})
+	}
+}
+
 func BenchmarkIPPrefixMasking(b *testing.B) {
 	tests := []struct {
 		name string
@@ -2579,6 +2591,7 @@ var (
 	sinkIP16          [16]byte
 	sinkIP4           [4]byte
 	sinkBool          bool
+	sinkString        string
 )
 
 func TestNoAllocs(t *testing.T) {

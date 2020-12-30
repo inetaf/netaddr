@@ -716,7 +716,7 @@ func splitIPPort(s string) (ip, port string, v6 bool, err error) {
 		if len(ip) < 2 || ip[len(ip)-1] != ']' {
 			return "", "", false, errors.New("missing ]")
 		}
-		ip = ip[1:len(ip)-1]
+		ip = ip[1 : len(ip)-1]
 		v6 = true
 	}
 
