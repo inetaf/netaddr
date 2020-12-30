@@ -133,7 +133,7 @@ func ParseIP(s string) (IP, error) {
 		case '%':
 			// Assume that this was trying to be an IPv6 address with
 			// a zone specifier, but the address is missing.
-			return IP{}, parseIPErrorf(s, "missing IPv6 address")
+			return IP{}, parseIPError{in: s, msg: "missing IPv6 address"}
 		}
 	}
 	return IP{}, errors.New("unable to parse IP")
@@ -149,14 +149,22 @@ func MustParseIP(s string) IP {
 	return ip
 }
 
-func parseIPErrorf(ip, msg string, args ...interface{}) error {
-	msg = "ParseIP(%q): " + msg
-	args = append([]interface{}{ip}, args...)
-	return fmt.Errorf(msg, args...)
+type parseIPError struct {
+	in  string // the string given to ParseIP
+	msg string // an explanation of the parse failure
+	at  string // optionally, the unparsed portion of in at which the error occurred.
+}
+
+func (err parseIPError) Error() string {
+	if err.at != "" {
+		return fmt.Sprintf("ParseIP(%q): %s (at %q)", err.in, err.msg, err.at)
+	}
+	return fmt.Sprintf("ParseIP(%q): %s", err.in, err.msg)
 }
 
 // parseIPv4 parses s as an IPv4 address (in form "192.168.0.1").
-func parseIPv4(s string) (ip IP, err error) {
+func parseIPv4(in string) (ip IP, err error) {
+	s := in
 	var ip4 [4]byte
 
 	for i := 0; i < 4; i++ {
@@ -176,12 +184,12 @@ func parseIPv4(s string) (ip IP, err error) {
 			}
 			acc = (acc * 10) + uint16(s[j]-'0')
 			if acc > 255 {
-				return IP{}, parseIPErrorf(s, "IPv4 field has value >255")
+				return IP{}, parseIPError{in: in, msg: "IPv4 field has value >255", at: s}
 			}
 		}
 		// There must be at least 1 digit per quad.
 		if j == 0 {
-			return IP{}, parseIPErrorf(s, "each dot-separated field must have at least one digit")
+			return IP{}, parseIPError{in: in, msg: "each dot-separated field must have at least one digit", at: s}
 		}
 
 		ip4[i] = uint8(acc)
@@ -189,9 +197,9 @@ func parseIPv4(s string) (ip IP, err error) {
 		// Non-final byte must be followed by a dot
 		if i < 3 {
 			if len(s) == j {
-				return IP{}, parseIPErrorf(s, "address too short")
+				return IP{}, parseIPError{in: in, msg: "address too short"}
 			} else if s[j] != '.' {
-				return IP{}, parseIPErrorf(s, "unexpected character %q", s[j])
+				return IP{}, parseIPError{in: in, msg: "unexpected character", at: s[j:]}
 			}
 			j++
 		}
@@ -201,16 +209,18 @@ func parseIPv4(s string) (ip IP, err error) {
 	}
 	if len(s) != 0 {
 		if s[0] == '%' {
-			return IP{}, parseIPErrorf(s, "zone specifier not allowed with IPv4 addresses")
+			return IP{}, parseIPError{in: in, msg: "zone specifier not allowed with IPv4 addresses", at: s}
 		}
-		return IP{}, parseIPErrorf(s, "trailing garbage after address")
+		return IP{}, parseIPError{in: in, msg: "trailing garbage after address", at: s}
 	}
 
 	return IPv4(ip4[0], ip4[1], ip4[2], ip4[3]), nil
 }
 
 // parseIPv6 parses s as an IPv6 address (in form "2001:db8::68").
-func parseIPv6(s string) (IP, error) {
+func parseIPv6(in string) (IP, error) {
+	s := in
+
 	// Split off the zone right from the start. Yes it's a second scan
 	// of the string, but trying to handle it inline makes a bunch of
 	// other inner loop conditionals more expensive, and it ends up
@@ -221,7 +231,7 @@ func parseIPv6(s string) (IP, error) {
 		s, zone = s[:i], s[i+1:]
 		if zone == "" {
 			// Not allowed to have an empty zone if explicitly specified.
-			return IP{}, parseIPErrorf(s, "zone must be a non-empty string")
+			return IP{}, parseIPError{in: in, msg: "zone must be a non-empty string"}
 		}
 	}
 
@@ -258,30 +268,30 @@ func parseIPv6(s string) (IP, error) {
 			}
 			if acc > maxUint16 {
 				// Overflow, fail.
-				return IP{}, parseIPErrorf(s, "IPv6 field has value >=2^16")
+				return IP{}, parseIPError{in: in, msg: "IPv6 field has value >=2^16", at: s}
 			}
 		}
 		if off == 0 {
 			// No digits found, fail.
-			return IP{}, parseIPErrorf(s, "each colon-separated field must have at least one digit")
+			return IP{}, parseIPError{in: in, msg: "each colon-separated field must have at least one digit", at: s}
 		}
 
 		// If followed by dot, might be in trailing IPv4.
 		if off < len(s) && s[off] == '.' {
 			if ellipsis < 0 && i != 12 {
 				// Not the right place.
-				return IP{}, parseIPErrorf(s, "embedded IPv4 address must replace the final 2 fields of the address")
+				return IP{}, parseIPError{in: in, msg: "embedded IPv4 address must replace the final 2 fields of the address", at: s}
 			}
 			if i+4 > 16 {
 				// Not enough room.
-				return IP{}, parseIPErrorf(s, "too many hex fields to fit an embedded IPv4 at the end of the address")
+				return IP{}, parseIPError{in: in, msg: "too many hex fields to fit an embedded IPv4 at the end of the address", at: s}
 			}
 			// TODO: could make this a bit faster by having a helper
 			// that parses to a [4]byte, and have both parseIPv4 and
 			// parseIPv6 use it.
 			ip4, err := parseIPv4(s)
 			if err != nil {
-				return IP{}, parseIPErrorf(s, "parsing embedded IPv4: %w", err)
+				return IP{}, parseIPError{in: in, msg: err.Error(), at: s}
 			}
 			ip[i] = ip4.v4(0)
 			ip[i+1] = ip4.v4(1)
@@ -305,16 +315,16 @@ func parseIPv6(s string) (IP, error) {
 
 		// Otherwise must be followed by colon and more.
 		if s[0] != ':' {
-			return IP{}, parseIPErrorf(s, "unexpected character %q when colon expected", s[0])
+			return IP{}, parseIPError{in: in, msg: "unexpected character, want colon", at: s}
 		} else if len(s) == 1 {
-			return IP{}, parseIPErrorf(s, "colon must be followed by more characters")
+			return IP{}, parseIPError{in: in, msg: "colon must be followed by more characters", at: s}
 		}
 		s = s[1:]
 
 		// Look for ellipsis.
 		if s[0] == ':' {
 			if ellipsis >= 0 { // already have one
-				return IP{}, parseIPErrorf(s, "multiple :: in address")
+				return IP{}, parseIPError{in: in, msg: "multiple :: in address", at: s}
 			}
 			ellipsis = i
 			s = s[1:]
@@ -326,13 +336,13 @@ func parseIPv6(s string) (IP, error) {
 
 	// Must have used entire string.
 	if len(s) != 0 {
-		return IP{}, parseIPErrorf(s, "trailing garbage after address")
+		return IP{}, parseIPError{in: in, msg: "trailing garbage after address", at: s}
 	}
 
 	// If didn't parse enough, expand ellipsis.
 	if i < 16 {
 		if ellipsis < 0 {
-			return IP{}, parseIPErrorf(s, "address string too short")
+			return IP{}, parseIPError{in: in, msg: "address string too short"}
 		}
 		n := 16 - i
 		for j := i - 1; j >= ellipsis; j-- {
@@ -343,7 +353,7 @@ func parseIPv6(s string) (IP, error) {
 		}
 	} else if ellipsis >= 0 {
 		// Ellipsis must represent at least one 0 group.
-		return IP{}, parseIPErrorf(s, "the :: must expand to at least one field of zeros")
+		return IP{}, parseIPError{in: in, msg: "the :: must expand to at least one field of zeros"}
 	}
 	return IPv6Raw(ip).WithZone(zone), nil
 }
