@@ -1418,28 +1418,26 @@ func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, ok bool) {
 	if len(prefixes) == 0 {
 		return IPPrefix{}, false
 	}
-	existingPrefixes := make(map[uint8]IPPrefix)
+
+	var bestFit IPPrefix
 	for _, prefix := range prefixes {
-		existingPrefixes[prefix.Bits] = prefix
-	}
-	exactMatch, ok := existingPrefixes[bitLen]
-	if ok {
-		s.RemovePrefix(exactMatch)
-		return exactMatch, true
-	}
-
-	nextBiggerPrefix, ok := existingPrefixes[bitLen-1]
-	if !ok {
-		if len(prefixes) < 1 {
-			return IPPrefix{}, false
+		if prefix.Bits > bitLen {
+			continue
 		}
-		pfx := prefixes[0]
-		prefix := IPPrefix{IP: pfx.IP, Bits: bitLen}
-		s.RemovePrefix(prefix)
-		return prefix, true
+		if bestFit.IP.IsZero() || prefix.Bits > bestFit.Bits {
+			bestFit = prefix
+			if bestFit.Bits == bitLen {
+				// exact match, done.
+				break
+			}
+		}
 	}
 
-	prefix := IPPrefix{IP: nextBiggerPrefix.IP, Bits: bitLen}
+	if bestFit.IP.IsZero() {
+		return IPPrefix{}, false
+	}
+
+	prefix := IPPrefix{IP: bestFit.IP, Bits: bitLen}
 	s.RemovePrefix(prefix)
 	return prefix, true
 }

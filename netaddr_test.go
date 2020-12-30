@@ -1689,6 +1689,7 @@ func pxv(cidrStrs ...string) (out []IPPrefix) {
 	}
 	return
 }
+
 func TestIPSetRemoveFreePrefix(t *testing.T) {
 	pfx := mustIPPrefix
 	tests := []struct {
