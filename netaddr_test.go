@@ -222,6 +222,12 @@ func TestParseIP(t *testing.T) {
 		"1234",
 		// IPv4 with a zone specifier
 		"1.2.3.4%eth0",
+		// IPv4 field must have at least one digit
+		".1.2.3",
+		"1.2.3.",
+		"1..2.3",
+		// IPv4 address too long
+		"1.2.3.4.5",
 		// IPv4 in dotted octal form
 		"0300.0250.0214.0377",
 		// IPv4 in dotted hex form
@@ -236,7 +242,7 @@ func TestParseIP(t *testing.T) {
 		// IPv4 in class A form, with a small enough number to be
 		// parseable as a regular dotted decimal field.
 		"127.1",
-		// IPv4 with a field bigger than 1b
+		// IPv4 field has value >255
 		"192.168.300.1",
 		// IPv4 with too many fields
 		"192.168.0.1.5.6",
