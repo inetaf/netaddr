@@ -414,7 +414,11 @@ func (ip IP) v6(i uint8) uint8 {
 // The zero value is not a valid IP address of any type.
 //
 // Note that "0.0.0.0" and "::" are not the zero value.
-func (ip IP) IsZero() bool { return ip == IP{} }
+func (ip IP) IsZero() bool {
+	// Faster than comparing ip == IP{}, but effectively equivalent,
+	// as there's no way to make an IP with a nil z from this package.
+	return ip.z == nil
+}
 
 // BitLen returns the number of bits in the IP address:
 // 32 for IPv4 or 128 for IPv6.
@@ -1194,6 +1198,34 @@ func (u uint128) and(m uint128) uint128 {
 	return uint128{u[0] & m[0], u[1] & m[1]}
 }
 
+// xor returns the bitwise XOR of u and m (u^m).
+func (u uint128) xor(m uint128) uint128 {
+	return uint128{u[0] ^ m[0], u[1] ^ m[1]}
+}
+
+// or returns the bitwise OR of u and m (u|m).
+func (u uint128) or(m uint128) uint128 {
+	return uint128{u[0] | m[0], u[1] | m[1]}
+}
+
+func u64CommonPrefixLen(a, b uint64) uint8 {
+	for i := uint8(0); i < 64; i++ {
+		if a == b {
+			return 64 - i
+		}
+		a >>= 1
+		b >>= 1
+	}
+	return 0
+}
+
+func (a uint128) commonPrefixLen(b uint128) (n uint8) {
+	if n = u64CommonPrefixLen(a[0], b[0]); n == 64 {
+		n += u64CommonPrefixLen(a[1], b[1])
+	}
+	return
+}
+
 // bitSet reports whether the given bit in the address is set.
 // (bit 0 is the most significant bit in ip[0]; bit 127 is last)
 // Results undefined for invalid bit numbers.
@@ -1247,40 +1279,31 @@ func (r IPRange) Prefixes() []IPPrefix {
 	if !r.Valid() {
 		return nil
 	}
-	return appendRangePrefixes(nil, r.prefixMaker(), r.From.addr, r.To.addr)
+	return appendRangePrefixes(nil, r.prefixFrom128AndBits, r.From.addr, r.To.addr)
 }
 
-func (r IPRange) prefixMaker() prefixMaker {
+func (r IPRange) prefixFrom128AndBits(a uint128, bits uint8) IPPrefix {
+	ip := IP{addr: a, z: r.From.z}
 	if r.From.Is4() {
-		return func(a uint128, bits uint8) IPPrefix {
-			return IPPrefix{IP{addr: a, z: z4}, bits - 12*8}
-		}
+		bits -= 12 * 8
 	}
-	return func(a uint128, bits uint8) IPPrefix {
-		return IPPrefix{IP{addr: a, z: z6noz}, bits}
-	}
+	return IPPrefix{ip, bits}
 }
 
-func comparePrefixes(a, b uint128) (common uint8, aAllZero, bAllSet bool) {
-	for common < 128 && a.bitSet(common) == b.bitSet(common) {
-		common++
-	}
+// aZeroBSet is whether, after the common bits, a is all zero bits and
+// b is all set (one) bits.
+func comparePrefixes(a, b uint128) (common uint8, aZeroBSet bool) {
+	common = a.commonPrefixLen(b)
+
 	// See whether a and b, after their common shared bits, end
 	// in all zero bits or all one bits, respectively.
-	aAllZero, bAllSet = true, true
-	for i := common; i < 128; i++ {
-		if a.bitSet(i) {
-			aAllZero = false
-			break
-		}
+	if common == 128 {
+		return common, true
 	}
-	for i := common; i < 128; i++ {
-		if !b.bitSet(i) {
-			bAllSet = false
-			break
-		}
-	}
-	return
+
+	m := mask6(common)
+	return common, (a.xor(a.and(m)) == uint128{} &&
+		b.or(m) == uint128{^uint64(0), ^uint64(0)})
 }
 
 // Prefix returns r as an IPPrefix, if it can be presented exactly as such.
@@ -1289,17 +1312,17 @@ func (r IPRange) Prefix() (p IPPrefix, ok bool) {
 	if !r.Valid() {
 		return
 	}
-	if common, aAllZero, bAllSet := comparePrefixes(r.From.addr, r.To.addr); aAllZero && bAllSet {
-		return r.prefixMaker()(r.From.addr, common), true
+	if common, ok := comparePrefixes(r.From.addr, r.To.addr); ok {
+		return r.prefixFrom128AndBits(r.From.addr, common), true
 	}
 	return
 }
 
 func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) []IPPrefix {
-	common, aAllZero, bAllSet := comparePrefixes(a, b)
-	if aAllZero && bAllSet {
-		// a16 to b16 represents a whole range, like 10.50.0.0/16.
-		// (a16 being 10.50.0.0 and b16 being 10.50.255.255)
+	common, ok := comparePrefixes(a, b)
+	if ok {
+		// a to b represents a whole range, like 10.50.0.0/16.
+		// (a being 10.50.0.0 and b being 10.50.255.255)
 		return append(dst, makePrefix(a, common))
 	}
 	// Otherwise recursively do both halves.
