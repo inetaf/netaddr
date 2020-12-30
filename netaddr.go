@@ -601,8 +601,7 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 			return IPPrefix{}, fmt.Errorf("prefix length %d too large for IPv6", bits)
 		}
 	}
-	mhi, mlo := mask6(effectiveBits)
-	ip.addr = uint128{ip.hi() & mhi, ip.lo() & mlo}
+	ip.addr = ip.addr.and(mask6(effectiveBits))
 	return IPPrefix{ip, bits}, nil
 }
 
@@ -975,32 +974,32 @@ func mask4(n uint8) uint32 {
 }
 
 // mask6 returns a bit mask that selects the topmost n bits of a
-// 128-bit number. Due to Go's lack of 128-bit numeric types, the mask
-// is returned as a pair of uint64s, in the same order as the uint64
-// pair in the IP type.
-func mask6(n uint8) (hi, lo uint64) {
+// 128-bit number.
+func mask6(n uint8) uint128 {
 	if n > 64 {
-		return ^uint64(0), ^uint64(0) << (128 - n)
+		return uint128{^uint64(0), ^uint64(0) << (128 - n)}
 	} else {
-		return ^uint64(0) << (64 - n), 0
+		return uint128{^uint64(0) << (64 - n), 0}
 	}
 }
 
-// Contains reports whether the network p includes addr.
+// Contains reports whether the network p includes ip.
 //
 // An IPv4 address will not match an IPv6 prefix.
 // A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
-func (p IPPrefix) Contains(addr IP) bool {
-	if f1, f2 := p.IP.BitLen(), addr.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
+func (p IPPrefix) Contains(ip IP) bool {
+	if f1, f2 := p.IP.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
 		return false
 	}
-	if addr.Is4() {
+	if ip.Is4() {
 		m := mask4(p.Bits)
-		return uint32(addr.lo())&m == uint32(p.IP.lo())&m
+		return uint32(ip.lo())&m == uint32(p.IP.lo())&m
 	} else {
-		mhi, mlo := mask6(p.Bits)
-		return addr.hi()&mhi == p.IP.hi()&mhi && addr.lo()&mlo == p.IP.lo()&mlo
+		m := mask6(p.Bits)
+		// TODO: benchmark whether the short circuit below is faster or slower
+		// than the higher level alternative: 'ip.addr.and(m) == p.IP.addr.and(m)'.
+		return ip.hi()&m[0] == p.IP.hi()&m[0] && ip.lo()&m[1] == p.IP.lo()&m[1]
 	}
 }
 
@@ -1189,6 +1188,11 @@ func (r IPRange) Overlaps(o IPRange) bool {
 // uint128 represents a uint128 using two uint64s.
 // Index 0 contains the high bits, index 1 contains the low.
 type uint128 [2]uint64
+
+// and returns the bitwise AND of u and m (u&m).
+func (u uint128) and(m uint128) uint128 {
+	return uint128{u[0] & m[0], u[1] & m[1]}
+}
 
 // bitSet reports whether the given bit in the address is set.
 // (bit 0 is the most significant bit in ip[0]; bit 127 is last)

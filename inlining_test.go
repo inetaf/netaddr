@@ -80,6 +80,7 @@ func TestInlining(t *testing.T) {
 		"discardf",
 		"mask4",
 		"mask6",
+		"uint128.and",
 		"uint128.bitSet",
 	} {
 		if !got[want] {
