@@ -410,6 +410,10 @@ func (ip IP) v6(i uint8) uint8 {
 	return uint8(ip.addr[(i/8)%2] >> ((7 - i%8) * 8))
 }
 
+func (ip IP) v6u16(i uint8) uint16 {
+	return uint16(ip.addr[(i/4)%2] >> ((3-i%4) * 16))
+}
+
 // IsZero reports whether ip is the zero value of the IP type.
 // The zero value is not a valid IP address of any type.
 //
@@ -557,7 +561,7 @@ func (ip IP) IsLinkLocalUnicast() bool {
 		return ip.v4(0) == 169 && ip.v4(1) == 254
 	}
 	if ip.Is6() {
-		return ip.v6(0) == 0xfe && ip.v6(1) == 0x80
+		return ip.v6u16(0) == 0xfe80
 	}
 	return false // zero value
 }
@@ -647,22 +651,109 @@ func (ip IP) As4() [4]byte {
 // Note that unlike the Go standard library's IP.String method,
 // IP4-mapped IPv6 addresses do not format as dotted decimals.
 func (ip IP) String() string {
-	if ip.z == z0 {
+	switch ip.z {
+	case z0:
 		return "invalid IP"
+	case z4:
+		return ip.string4()
+	default:
+		return ip.string6()
 	}
-	if ip.Is4() {
-		return fmt.Sprintf("%d.%d.%d.%d", ip.v4(0), ip.v4(1), ip.v4(2), ip.v4(3))
+}
+
+// digits is a string of the hex digits from 0 to f. It's used in
+// appendDecimal and appendHex to format IP addresses.
+const digits = "0123456789abcdef"
+
+// appendDecimal appends the decimal string representation of x to b.
+func appendDecimal(b []byte, x uint8) []byte {
+	// Using this function rather than strconv.AppendUint makes IPv4
+	// string building 2x faster.
+
+	if x >= 100 {
+		b = append(b, digits[x/100])
 	}
-	if ip.Is4in6() {
-		zone := ip.Zone()
-		var percent string
-		if zone != "" {
-			percent = "%"
+	if x >= 10 {
+		b = append(b, digits[x/10%10])
+	}
+	return append(b, digits[x%10])
+}
+
+// appendHex appends the hex string representation of x to b.
+func appendHex(b []byte, x uint16) []byte {
+	// Using this function rather than strconv.AppendUint makes IPv6
+	// string building 2x faster.
+
+	if x >= 0x1000 {
+		b = append(b, digits[x>>12])
+	}
+	if x >= 0x100 {
+		b = append(b, digits[x>>8&0xf])
+	}
+	if x >= 0x10 {
+		b = append(b, digits[x>>4&0xf])
+	}
+	return append(b, digits[x&0xf])
+}
+
+func (ip IP) string4() string {
+	const max = len("255.255.255.255")
+	ret := make([]byte, 0, max)
+	ret = appendDecimal(ret, ip.v4(0))
+	ret = append(ret, '.')
+	ret = appendDecimal(ret, ip.v4(1))
+	ret = append(ret, '.')
+	ret = appendDecimal(ret, ip.v4(2))
+	ret = append(ret, '.')
+	ret = appendDecimal(ret, ip.v4(3))
+	return string(ret)
+}
+
+// string6 formats ip in IPv6 textual representation. It follows the
+// guidelines in section 4 of RFC 5952
+// (https://tools.ietf.org/html/rfc5952#section-4): no unnecessary
+// zeros, use :: to elide the longest run of zeros, and don't use ::
+// to compact a single zero field.
+func (ip IP) string6() string {
+	zeroStart, zeroEnd := uint8(255), uint8(255)
+	for i := uint8(0); i < 8; i++ {
+		j := i
+		for j < 8 && ip.v6u16(j) == 0 {
+			j++
 		}
-		return fmt.Sprintf("::ffff:%x:%x%s%s", uint16(ip.v4(0))<<8|uint16(ip.v4(1)), uint16(ip.v4(2))<<8|uint16(ip.v4(3)), percent, zone)
+		if l := j - i; l >= 2 && l > zeroEnd-zeroStart {
+			zeroStart, zeroEnd = i, j
+		}
 	}
-	a16 := ip.As16()
-	return (&net.IPAddr{IP: net.IP(a16[:]), Zone: ip.Zone()}).String()
+
+	// Use a zone with a "plausibly long" name, so that most zone-ful
+	// IP addresses won't require additional allocation.
+	//
+	// The compiler does a cool optimization here, where ret ends up
+	// stack-allocated and so the only allocation this function does
+	// is to construct the returned string. As such, it's okay to be a
+	// bit greedy here, size-wise.
+	const max = len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0")
+	ret := make([]byte, 0, max)
+	for i := uint8(0); i < 8; i++ {
+		if i == zeroStart {
+			ret = append(ret, ':', ':')
+			i = zeroEnd
+			if i >= 8 {
+				break
+			}
+		} else if i > 0 {
+			ret = append(ret, ':')
+		}
+
+		ret = appendHex(ret, ip.v6u16(i))
+	}
+
+	if ip.z != z6noz {
+		ret = append(ret, '%')
+		ret = append(ret, ip.Zone()...)
+	}
+	return string(ret)
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,

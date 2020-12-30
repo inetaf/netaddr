@@ -62,6 +62,7 @@ func TestInlining(t *testing.T) {
 		"IP.lo",
 		"IP.v4",
 		"IP.v6",
+		"IP.v6u16",
 		"IP.withInternedZone",
 		"IPPort.IsZero",
 		"IPPort.MarshalText",
@@ -86,6 +87,8 @@ func TestInlining(t *testing.T) {
 		"uint128.bitSet",
 		"uint128.or",
 		"uint128.xor",
+		"appendDecimal",
+		"appendHex",
 	} {
 		if !got[want] {
 			t.Errorf("%q is no longer inlinable", want)
