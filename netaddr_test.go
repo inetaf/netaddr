@@ -1677,7 +1677,54 @@ func pxv(cidrStrs ...string) (out []IPPrefix) {
 	}
 	return
 }
-
+func TestIPSetRemoveFreePrefix(t *testing.T) {
+	pfx := mustIPPrefix
+	tests := []struct {
+		name         string
+		f            func(s *IPSet)
+		b            uint8
+		wantPrefix   IPPrefix
+		wantPrefixes []IPPrefix
+		wantOK       bool
+	}{
+		{
+			name: "cut in half",
+			f: func(s *IPSet) {
+				s.AddPrefix(pfx("10.0.0.0/8"))
+			},
+			b:            9,
+			wantPrefix:   pfx("10.0.0.0/9"),
+			wantPrefixes: pxv("10.128.0.0/9"),
+			wantOK:       true,
+		},
+		{
+			name: "on prefix left",
+			f: func(s *IPSet) {
+				s.AddPrefix(pfx("10.0.0.0/8"))
+				s.RemovePrefix(pfx("10.0.0.0/9"))
+			},
+			b:            9,
+			wantPrefix:   pfx("10.128.0.0/9"),
+			wantPrefixes: nil,
+			wantOK:       true,
+		},
+	}
+	for _, tt := range tests {
+		var s IPSet
+		tt.f(&s)
+		got, ok := s.RemoveFreePrefix(tt.b)
+		if ok != tt.wantOK {
+			t.Errorf("extractPrefix() ok = %t, wantOK %t", ok, tt.wantOK)
+			return
+		}
+		if !reflect.DeepEqual(got, tt.wantPrefix) {
+			t.Errorf("extractPrefix() = %v, want %v", got, tt.wantPrefix)
+		}
+		if !reflect.DeepEqual(s.Prefixes(), tt.wantPrefixes) {
+			t.Errorf("extractPrefix() = %v, want %v", s.Prefixes(), tt.wantPrefixes)
+		}
+	}
+}
 func TestIPSet(t *testing.T) {
 	tests := []struct {
 		name         string
