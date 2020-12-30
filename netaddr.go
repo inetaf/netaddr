@@ -163,58 +163,37 @@ func (err parseIPError) Error() string {
 }
 
 // parseIPv4 parses s as an IPv4 address (in form "192.168.0.1").
-func parseIPv4(in string) (ip IP, err error) {
-	s := in
-	var ip4 [4]byte
-
-	for i := 0; i < 4; i++ {
-		var (
-			j   int
-			acc uint16
-		)
-		// Parse one byte of digits. Bail if we overflow, stop at
-		// first non-digit.
-		//
-		// As of Go 1.15, don't try to factor this digit reading into
-		// a helper function. Its complexity is slightly too high for
-		// inlining, which ends up costing +50% in parse time.
-		for j = 0; j < len(s); j++ {
-			if s[j] < '0' || s[j] > '9' {
-				break
+func parseIPv4(s string) (ip IP, err error) {
+	var fields [3]uint8
+	var val, pos int
+	for i := 0; i < len(s); i++ {
+		if s[i] >= '0' && s[i] <= '9' {
+			val = val*10 + int(s[i]) - '0'
+			if val > 255 {
+				return IP{}, parseIPError{in: s, msg: "IPv4 field has value >255"}
 			}
-			acc = (acc * 10) + uint16(s[j]-'0')
-			if acc > 255 {
-				return IP{}, parseIPError{in: in, msg: "IPv4 field has value >255", at: s}
+		} else if s[i] == '.' {
+			// .1.2.3
+			// 1.2.3.
+			// 1..2.3
+			if i == 0 || i == len(s)-1 || s[i-1] == '.' {
+				return IP{}, parseIPError{in: s, msg: "IPv4 field must have at least one digit", at: s[i:]}
 			}
-		}
-		// There must be at least 1 digit per quad.
-		if j == 0 {
-			return IP{}, parseIPError{in: in, msg: "each dot-separated field must have at least one digit", at: s}
-		}
-
-		ip4[i] = uint8(acc)
-
-		// Non-final byte must be followed by a dot
-		if i < 3 {
-			if len(s) == j {
-				return IP{}, parseIPError{in: in, msg: "address too short"}
-			} else if s[j] != '.' {
-				return IP{}, parseIPError{in: in, msg: "unexpected character", at: s[j:]}
+			// 1.2.3.4.5
+			if pos == 3 {
+				return IP{}, parseIPError{in: s, msg: "IPv4 address too long"}
 			}
-			j++
+			fields[pos] = uint8(val)
+			pos++
+			val = 0
+		} else {
+			return IP{}, parseIPError{in: s, msg: "unexpected character", at: s[i:]}
 		}
-
-		// Advance to the next set of digits.
-		s = s[j:]
 	}
-	if len(s) != 0 {
-		if s[0] == '%' {
-			return IP{}, parseIPError{in: in, msg: "zone specifier not allowed with IPv4 addresses", at: s}
-		}
-		return IP{}, parseIPError{in: in, msg: "trailing garbage after address", at: s}
+	if pos < 3 {
+		return IP{}, parseIPError{in: s, msg: "IPv4 address too short"}
 	}
-
-	return IPv4(ip4[0], ip4[1], ip4[2], ip4[3]), nil
+	return IPv4(fields[0], fields[1], fields[2], uint8(val)), nil
 }
 
 // parseIPv6 parses s as an IPv6 address (in form "2001:db8::68").
