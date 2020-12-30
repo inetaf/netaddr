@@ -20,7 +20,6 @@ import (
 	"sort"
 	"strconv"
 	"strings"
-	"sync"
 
 	"go4.org/intern"
 )
@@ -910,28 +909,29 @@ func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
 	return IPPort{IP: ip, Port: uint16(port)}, true
 }
 
-var udpAddrPool = &sync.Pool{
-	New: func() interface{} { return new(net.UDPAddr) },
-}
-
 // UDPAddr returns a standard library net.UDPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero
 // value, then UDPAddr.IP is nil.
 //
-// UDPAddr necessarily does two allocations. If you call PutUDPAddr
-// after you're done with it, though, then subsequent UDPAddr calls
-// can reuse the memory.
+// UDPAddr necessarily does two allocations. If you have an existing
+// UDPAddr already allocated, see UDPAddrAt.
 func (p IPPort) UDPAddr() *net.UDPAddr {
-	ua := udpAddrPool.Get().(*net.UDPAddr)
-	ua.Port = int(p.Port)
-	ua.IP, ua.Zone = p.IP.ipZone(ua.IP)
-	return ua
+	ret := &net.UDPAddr{
+		Port: int(p.Port),
+	}
+	ret.IP, ret.Zone = p.IP.ipZone(nil)
+	return ret
 }
 
-// PutUDPAddr adds ua to an internal pool for later reuse by IPPort.UDPAddr.
-// Use of PutUDPAddr is optional; improper use can cause mysterious errors.
-// You must only call PutUDPAddr if there are no remaining references to ua.
-func PutUDPAddr(ua *net.UDPAddr) { udpAddrPool.Put(ua) }
+// UDPAddrAt is like UDPAddr, but reuses the provided UDPAddr, which
+// must be non-nil. If at.IP has a capacity of 16, UDPAddrAt is
+// allocation-free. It returns at to facilitate using this method as a
+// wrapper.
+func (p IPPort) UDPAddrAt(at *net.UDPAddr) *net.UDPAddr {
+	at.Port = int(p.Port)
+	at.IP, at.Zone = p.IP.ipZone(at.IP)
+	return at
+}
 
 // TCPAddr returns a standard library net.UDPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero

@@ -1333,12 +1333,12 @@ func TestUDPAddrAllocs(t *testing.T) {
 		if err != nil {
 			t.Fatalf("invalid %q", ep)
 		}
+		ua := &net.UDPAddr{IP: make(net.IP, 0, 16)}
 		n := int(testing.AllocsPerRun(1000, func() {
-			ua := ipp.UDPAddr()
+			ua := ipp.UDPAddrAt(ua)
 			if ua.Port != int(ipp.Port) {
 				t.Fatal("UDPAddr returned bogus result")
 			}
-			PutUDPAddr(ua)
 		}))
 		if n > 0 {
 			t.Errorf("%d allocs for %q", n, ep)
@@ -2714,6 +2714,7 @@ var (
 	sinkIP4           [4]byte
 	sinkBool          bool
 	sinkString        string
+	sinkUDPAddr       = &net.UDPAddr{IP: make(net.IP, 0, 16)}
 )
 
 func TestNoAllocs(t *testing.T) {
@@ -2821,6 +2822,9 @@ func TestNoAllocs(t *testing.T) {
 		std := net.IP{1, 2, 3, 4}
 		sinkIPPort = panicIPPOK(FromStdAddr(std, 5678, ""))
 	})
+
+	// IPPort methods
+	test("UDPAddrAt", func() { sinkUDPAddr = MustParseIPPort("1.2.3.4:1234").UDPAddrAt(sinkUDPAddr) })
 
 	// IPPrefix constructors
 	test("ParseIPPrefix/4", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("1.2.3.4/20")) })
