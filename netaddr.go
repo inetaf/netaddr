@@ -1088,6 +1088,9 @@ func mask6(n uint8) uint128 {
 // A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
 func (p IPPrefix) Contains(ip IP) bool {
+	if !p.Valid() {
+		return false
+	}
 	if f1, f2 := p.IP.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
 		return false
 	}
