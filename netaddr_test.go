@@ -2363,6 +2363,18 @@ func TestIPPrefixContains(t *testing.T) {
 		{mustIPPrefix("::1/127"), mustIP("::2"), false},
 		{mustIPPrefix("::1/128"), mustIP("::1"), true},
 		{mustIPPrefix("::1/127"), mustIP("::2"), false},
+		// invalid IP
+		{mustIPPrefix("::1/0"), IP{}, false},
+		{mustIPPrefix("1.2.3.4/0"), IP{}, false},
+		// invalid IPPrefix
+		{IPPrefix{mustIP("::1"), 129}, mustIP("::1"), false},
+		{IPPrefix{mustIP("1.2.3.4"), 33}, mustIP("1.2.3.4"), false},
+		{IPPrefix{IP{}, 0}, mustIP("1.2.3.4"), false},
+		{IPPrefix{IP{}, 32}, mustIP("1.2.3.4"), false},
+		{IPPrefix{IP{}, 128}, mustIP("::1"), false},
+		// wrong IP family
+		{mustIPPrefix("::1/0"), mustIP("1.2.3.4"), false},
+		{mustIPPrefix("1.2.3.4/0"), mustIP("::1"), false},
 	}
 	for _, tt := range tests {
 		got := tt.ipp.Contains(tt.ip)
