@@ -12,8 +12,8 @@ jobs:
   build:
     strategy:
       matrix:
-        # Oldest we support (1.11) and a latest few:
-        go-version: [1.11, 1.14, 1.15]
+        # Oldest we support (1.12) and a latest couple:
+        go-version: [1.12, 1.14, 1.15]
     runs-on: ubuntu-latest
 
     steps:

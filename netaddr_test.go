@@ -2029,6 +2029,31 @@ var nextPriorTests = []struct {
 
 func TestIPNextPrior(t *testing.T) {
 	doNextPrior(t)
+
+	for _, ip := range []IP{
+		mustIP("0.0.0.0"),
+		mustIP("::"),
+	} {
+		got := ip.Prior()
+		if !got.IsZero() {
+			t.Errorf("IP(%v).Prior = %v; want zero", ip, got)
+		}
+	}
+
+	var allFF [16]byte
+	for i := range allFF {
+		allFF[i] = 0xff
+	}
+
+	for _, ip := range []IP{
+		mustIP("255.255.255.255"),
+		IPv6Raw(allFF),
+	} {
+		got := ip.Next()
+		if !got.IsZero() {
+			t.Errorf("IP(%v).Next = %v; want zero", ip, got)
+		}
+	}
 }
 
 func BenchmarkIPNextPrior(b *testing.B) {
