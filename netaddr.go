@@ -420,7 +420,7 @@ func (ip IP) v6u16(i uint8) uint16 {
 func (ip IP) IsZero() bool {
 	// Faster than comparing ip == IP{}, but effectively equivalent,
 	// as there's no way to make an IP with a nil z from this package.
-	return ip.z == nil
+	return ip.z == z0
 }
 
 // BitLen returns the number of bits in the IP address:
