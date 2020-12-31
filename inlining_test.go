@@ -23,6 +23,7 @@ func TestInlining(t *testing.T) {
 	if testing.Short() {
 		t.Skip("skipping in short mode")
 	}
+	t.Parallel()
 	var exe string
 	if runtime.GOOS == "windows" {
 		exe = ".exe"

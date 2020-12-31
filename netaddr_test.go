@@ -9,6 +9,7 @@ package netaddr
 import (
 	"bytes"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"math/rand"
@@ -2502,6 +2503,8 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 	return
 }
 
+var long = flag.Bool("long", false, "run long tests")
+
 // TestIPSetRanges tests IPSet.Ranges against 64k
 // patterns of sets of ranges, checking the real implementation
 // against the test's separate implementation.
@@ -2509,9 +2512,10 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 // For each of uint16 pattern, each set bit is treated as an IP that
 // should be in the set's resultant Ranges.
 func TestIPSetRanges(t *testing.T) {
-	upper := 0xffff
-	if testing.Short() {
-		upper = 0x0fff
+	t.Parallel()
+	upper := 0x0fff
+	if *long {
+		upper = 0xffff
 	}
 	for pat := 0; pat <= upper; pat++ {
 		var s IPSet
@@ -2547,9 +2551,12 @@ func TestIPSetRanges(t *testing.T) {
 }
 
 func TestIPSetRangesStress(t *testing.T) {
-	n := 500
+	t.Parallel()
+	n := 50
 	if testing.Short() {
 		n /= 10
+	} else if *long {
+		n = 500
 	}
 	randRange := func() (a, b int, r IPRange) {
 		a, b = rand.Intn(0x10000), rand.Intn(0x10000)
