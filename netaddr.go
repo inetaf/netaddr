@@ -1251,9 +1251,12 @@ func (r IPRange) Valid() bool {
 //
 // An invalid range always reports false.
 func (r IPRange) Contains(addr IP) bool {
-	return r.Valid() &&
-		r.From.Compare(addr) <= 0 &&
-		r.To.Compare(addr) >= 0
+	return r.Valid() && r.contains(addr)
+}
+
+// contains is like Contains, but without the validity check. For internal use.
+func (r IPRange) contains(addr IP) bool {
+	return r.From.Compare(addr) <= 0 && r.To.Compare(addr) >= 0
 }
 
 // Overlaps reports whether p and o overlap at all.
@@ -1739,12 +1742,6 @@ func (s *IPSet) ContainsFunc() (contains func(IP) bool) {
 			return false
 		}
 		i--
-		if ip.Less(rv[i].From) {
-			return false
-		}
-		if rv[i].To.Less(ip) {
-			return false
-		}
-		return true
+		return rv[i].contains(ip)
 	}
 }
