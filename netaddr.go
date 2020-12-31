@@ -1034,14 +1034,13 @@ func (p IPPrefix) Range() IPRange {
 // The returned value is always non-nil.
 // Any zone identifier is dropped in the conversion.
 func (p IPPrefix) IPNet() *net.IPNet {
-	bits := 128
-	if p.IP.Is4() {
-		bits = 32
+	if !p.Valid() {
+		return &net.IPNet{}
 	}
 	stdIP, _ := p.IP.ipZone(nil)
 	return &net.IPNet{
 		IP:   stdIP,
-		Mask: net.CIDRMask(int(p.Bits), bits),
+		Mask: net.CIDRMask(int(p.Bits), int(p.IP.BitLen())),
 	}
 }
 
@@ -1092,7 +1091,7 @@ func (p IPPrefix) Contains(ip IP) bool {
 //
 // If either has a Bits of zero, it returns true.
 func (p IPPrefix) Overlaps(o IPPrefix) bool {
-	if p.IP.IsZero() || o.IP.IsZero() {
+	if !p.Valid() || !o.Valid() {
 		return false
 	}
 	if p == o {
@@ -1154,12 +1153,15 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 
 // Strings returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
+	if !p.Valid() {
+		return "invalid IP prefix"
+	}
 	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
 }
 
 // lastIP returns the last IP in the prefix.
 func (p IPPrefix) lastIP() IP {
-	if p.IP.IsZero() {
+	if !p.Valid() {
 		return IP{}
 	}
 	a16 := p.IP.As16()
