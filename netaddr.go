@@ -410,7 +410,7 @@ func (ip IP) v6(i uint8) uint8 {
 }
 
 func (ip IP) v6u16(i uint8) uint16 {
-	return uint16(ip.addr[(i/4)%2] >> ((3-i%4) * 16))
+	return uint16(ip.addr[(i/4)%2] >> ((3 - i%4) * 16))
 }
 
 // IsZero reports whether ip is the zero value of the IP type.
