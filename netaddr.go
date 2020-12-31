@@ -16,15 +16,13 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"math"
 	"net"
 	"strconv"
 	"strings"
 
 	"go4.org/intern"
 )
-
-// copied to avoid importing math.
-const maxUint16 = 1<<16 - 1
 
 // Sizes: (64-bit)
 //   net.IP:     24 byte slice header + {4, 16} = 28 to 40 bytes
@@ -247,7 +245,7 @@ func parseIPv6(in string) (IP, error) {
 			} else {
 				break
 			}
-			if acc > maxUint16 {
+			if acc > math.MaxUint16 {
 				// Overflow, fail.
 				return IP{}, parseIPError{in: in, msg: "IPv6 field has value >=2^16", at: s}
 			}
@@ -869,7 +867,7 @@ func (p *IPPort) UnmarshalText(text []byte) error {
 // UDPAddr into an IPPort.
 func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
 	ip, ok := FromStdIP(stdIP)
-	if !ok || port < 0 || port > maxUint16 {
+	if !ok || port < 0 || port > math.MaxUint16 {
 		return
 	}
 	ip = ip.Unmap()
