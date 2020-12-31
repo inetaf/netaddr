@@ -2698,6 +2698,15 @@ func TestPointLess(t *testing.T) {
 
 }
 
+// bitSet reports whether the given bit in the address is set.
+// (bit 0 is the most significant bit in ip[0]; bit 127 is last)
+// Results undefined for invalid bit numbers.
+func (u uint128) bitSet(bit uint8) bool {
+	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
+	s := 63 - (bit % 64)
+	return u[hli]&(1<<s) != 0
+}
+
 func TestUint128(t *testing.T) {
 	randU128 := func() (uint128, string) {
 		var a [16]byte

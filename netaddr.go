@@ -1304,15 +1304,6 @@ func (a uint128) commonPrefixLen(b uint128) (n uint8) {
 	return
 }
 
-// bitSet reports whether the given bit in the address is set.
-// (bit 0 is the most significant bit in ip[0]; bit 127 is last)
-// Results undefined for invalid bit numbers.
-func (u uint128) bitSet(bit uint8) bool {
-	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
-	s := 63 - (bit % 64)
-	return u[hli]&(1<<s) != 0
-}
-
 func (u *uint128) set(bit uint8) {
 	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
 	s := 63 - (bit % 64)
