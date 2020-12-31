@@ -6,8 +6,8 @@ package netaddr
 
 import (
 	"fmt"
-	"strings"
 	"strconv"
+	"strings"
 )
 
 // zeros is a slice of eight stringified zeros. It's used in
@@ -128,7 +128,7 @@ func normalizeIPv6Slow(orig string) (string, error) {
 		lhs, rhs := fs[0], fs[1]
 		// Found a ::, figure out how many zero blocks need to be
 		// inserted.
-		nblocks := strings.Count(lhs, ":")+strings.Count(rhs, ":")
+		nblocks := strings.Count(lhs, ":") + strings.Count(rhs, ":")
 		if lhs != "" {
 			nblocks++
 		}
