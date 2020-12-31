@@ -72,7 +72,7 @@ func TestInlining(t *testing.T) {
 		"IPPrefix.IsSingleIP",
 		"IPPrefix.IsZero",
 		"IPPrefix.Masked",
-		"IPPrefix.String",
+		"IPPrefix.MarshalText",
 		"IPPrefix.Valid",
 		"IPRange.prefixFrom128AndBits",
 		"IPRange.prefixFrom128AndBits-fm",

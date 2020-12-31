@@ -913,27 +913,31 @@ func TestIs4In6(t *testing.T) {
 
 func TestIPPrefixMasked(t *testing.T) {
 	tests := []struct {
-		prefix string
-		ip     IP
+		prefix IPPrefix
+		masked IPPrefix
 	}{
 		{
-			prefix: "192.168.0.255/24",
-			ip:     mustIP("192.168.0.0"),
+			prefix: mustIPPrefix("192.168.0.255/24"),
+			masked: mustIPPrefix("192.168.0.0/24"),
 		},
 		{
-			prefix: "2100::/3",
-			ip:     mustIP("2000::"),
+			prefix: mustIPPrefix("2100::/3"),
+			masked: mustIPPrefix("2000::/3"),
+		},
+		{
+			prefix: IPPrefix{IP: mustIP("2000::"), Bits: 129},
+			masked: IPPrefix{},
+		},
+		{
+			prefix: IPPrefix{IP: mustIP("1.2.3.4"), Bits: 33},
+			masked: IPPrefix{},
 		},
 	}
 	for _, test := range tests {
-		t.Run(test.prefix, func(t *testing.T) {
-			prefix, err := ParseIPPrefix(test.prefix)
-			if err != nil {
-				t.Fatal(err)
-			}
-			prefix = prefix.Masked()
-			if prefix.IP != test.ip {
-				t.Errorf("IP=%s, want %s", prefix.IP, test.ip)
+		t.Run(test.prefix.String(), func(t *testing.T) {
+			got := test.prefix.Masked()
+			if got != test.masked {
+				t.Errorf("Masked=%s, want %s", got, test.masked)
 			}
 		})
 	}
@@ -1707,10 +1711,18 @@ func TestIPPrefixOverlaps(t *testing.T) {
 
 		// v6-mapped v4 should not overlap with IPv4.
 		{IPPrefix{IP: IPv6Raw(mustIP("1.2.0.0").As16()), Bits: 16}, pfx("1.2.3.0/24"), false},
+
+		// Invalid prefixes
+		{IPPrefix{IP: mustIP("1.2.3.4"), Bits: 33}, pfx("1.2.3.0/24"), false},
+		{IPPrefix{IP: mustIP("2000::"), Bits: 129}, pfx("2000::/64"), false},
 	}
 	for i, tt := range tests {
 		if got := tt.a.Overlaps(tt.b); got != tt.want {
 			t.Errorf("%d. (%v).Overlaps(%v) = %v; want %v", i, tt.a, tt.b, got, tt.want)
+		}
+		// Overlaps is commutative
+		if got := tt.b.Overlaps(tt.a); got != tt.want {
+			t.Errorf("%d. (%v).Overlaps(%v) = %v; want %v", i, tt.b, tt.a, got, tt.want)
 		}
 	}
 }
