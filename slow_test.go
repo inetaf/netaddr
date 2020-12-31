@@ -82,7 +82,7 @@ func parseIPSlow(s string) (IP, error) {
 		ret[i*2+1] = b
 	}
 
-	return IPv6Raw(ret).WithZone(zone), nil
+	return IPFrom16(ret).WithZone(zone), nil
 }
 
 // normalizeIPv6Slow expands s, which is assumed to be an IPv6

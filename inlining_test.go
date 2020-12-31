@@ -87,6 +87,7 @@ func TestInlining(t *testing.T) {
 		"uint128.and",
 		"uint128.or",
 		"uint128.xor",
+		"uint128.not",
 		"appendDecimal",
 		"appendHex",
 	} {

@@ -77,7 +77,7 @@ var (
 
 // IPv6LinkLocalAllNodes returns the IPv6 link-local all nodes multicast
 // address ff02::1.
-func IPv6LinkLocalAllNodes() IP { return IPv6Raw([16]byte{0: 0xff, 1: 0x02, 15: 0x01}) }
+func IPv6LinkLocalAllNodes() IP { return IPFrom16([16]byte{0: 0xff, 1: 0x02, 15: 0x01}) }
 
 // IPv6Unspecified returns the IPv6 unspecified address ::.
 func IPv6Unspecified() IP { return IP{z: z6noz} }
@@ -90,10 +90,8 @@ func IPv4(a, b, c, d uint8) IP {
 	}
 }
 
-// IPv6Raw returns the IPv6 address given by the bytes in addr,
-// without an implicit Unmap call to unmap any v6-mapped IPv4
-// address.
-func IPv6Raw(addr [16]byte) IP {
+// IPFrom16 returns the IPv6 address given by the bytes in addr.
+func IPFrom16(addr [16]byte) IP {
 	return IP{
 		addr: uint128{
 			binary.BigEndian.Uint64(addr[:8]),
@@ -103,7 +101,7 @@ func IPv6Raw(addr [16]byte) IP {
 	}
 }
 
-// ipv6Slice is like IPv6Raw, but operates on a 16-byte slice. Assumes
+// ipv6Slice is like IPFrom16, but operates on a 16-byte slice. Assumes
 // slice is 16 bytes, caller must enforce this.
 func ipv6Slice(addr []byte) IP {
 	return IP{
@@ -113,14 +111,6 @@ func ipv6Slice(addr []byte) IP {
 		},
 		z: z6noz,
 	}
-}
-
-// IPFrom16 returns the IP address given by the bytes in addr,
-// unmapping any v6-mapped IPv4 address.
-//
-// It is equivalent to calling IPv6Raw(addr).Unmap().
-func IPFrom16(addr [16]byte) IP {
-	return IPv6Raw(addr).Unmap()
 }
 
 // ParseIP parses s as an IP address, returning the result. The string
@@ -337,7 +327,7 @@ func parseIPv6(in string) (IP, error) {
 		// Ellipsis must represent at least one 0 group.
 		return IP{}, parseIPError{in: in, msg: "the :: must expand to at least one field of zeros"}
 	}
-	return IPv6Raw(ip).WithZone(zone), nil
+	return IPFrom16(ip).WithZone(zone), nil
 }
 
 // FromStdIP returns an IP from the standard library's IP type.
@@ -352,9 +342,7 @@ func parseIPv6(in string) (IP, error) {
 // FromStdIPRaw.
 func FromStdIP(std net.IP) (ip IP, ok bool) {
 	ret, ok := FromStdIPRaw(std)
-	if ret.Is4in6() {
-		ret.z = z4
-	}
+	ret = ret.Unmap()
 	return ret, ok
 }
 
@@ -485,7 +473,7 @@ func (ip IP) IPAddr() *net.IPAddr {
 
 // Is4 reports whether ip is an IPv4 address.
 //
-// It returns false for IP4-mapped IPv6 addresses. See IP.Unmap.
+// It returns false for IPv4-mapped IPv6 addresses. See IP.Unmap.
 func (ip IP) Is4() bool {
 	return ip.z == z4
 }
@@ -509,6 +497,17 @@ func (ip IP) Is6() bool {
 func (ip IP) Unmap() IP {
 	if ip.Is4in6() {
 		ip.z = z4
+	}
+	return ip
+}
+
+// Map returns ip mapped into IPv6 space.
+//
+// That is, if ip is an IPv4 address, it returns an IPv4-mapped IPv6
+// address. Otherwise it returns ip, regardless of its type.
+func (ip IP) Map() IP {
+	if ip.Is4() {
+		ip.z = z6noz
 	}
 	return ip
 }
@@ -1160,22 +1159,14 @@ func (p IPPrefix) lastIP() IP {
 	if !p.Valid() {
 		return IP{}
 	}
-	a16 := p.IP.As16()
-	var off uint8
-	var bits uint8 = 128
 	if p.IP.Is4() {
-		off = 12
-		bits = 32
-	}
-	for b := p.Bits; b < bits; b++ {
-		byteNum, bitInByte := b/8, 7-(b%8)
-		a16[off+byteNum] |= 1 << uint(bitInByte)
-	}
-	if p.IP.Is4() {
-		return IPFrom16(a16)
+		m := ^mask4(p.Bits)
+		p.IP.addr.lo |= uint64(m)
 	} else {
-		return IPv6Raw(a16) // doesn't unmap
+		m := mask6(p.Bits).not()
+		p.IP.addr = p.IP.addr.or(m)
 	}
+	return p.IP
 }
 
 // IPRange represents an inclusive range of IP addresses
@@ -1287,6 +1278,10 @@ func (u uint128) xor(m uint128) uint128 {
 // or returns the bitwise OR of u and m (u|m).
 func (u uint128) or(m uint128) uint128 {
 	return uint128{u.hi | m.hi, u.lo | m.lo}
+}
+
+func (u uint128) not() uint128 {
+	return uint128{^u.hi, ^u.lo}
 }
 
 func u64CommonPrefixLen(a, b uint64) uint8 {
@@ -1434,10 +1429,11 @@ func subOne(a []byte, i int) bool {
 // ipFrom16Match returns an IP address from a with address family
 // matching ip.
 func ipFrom16Match(ip IP, a [16]byte) IP {
-	if ip.Is6() {
-		return IPv6Raw(a) // doesn't unwrap
+	ret := IPFrom16(a)
+	if ip.Is4() {
+		ret = ret.Unmap()
 	}
-	return IPFrom16(a)
+	return ret
 }
 
 func (ip IP) withInternedZone(z *intern.Value) IP {

@@ -337,12 +337,12 @@ func TestFromStdIP(t *testing.T) {
 			name: "v6",
 			fn:   FromStdIP,
 			std:  net.ParseIP("::1"),
-			want: IPv6Raw([...]byte{15: 1}),
+			want: IPFrom16([...]byte{15: 1}),
 		},
 		{
 			name: "4in6-unmap",
 			fn:   FromStdIP,
-			std:  net.ParseIP("1.2.3.4"),
+			std:  net.ParseIP("1.2.3.4").To16(),
 			want: IPv4(1, 2, 3, 4),
 		},
 		{
@@ -355,7 +355,7 @@ func TestFromStdIP(t *testing.T) {
 			name: "4in6-raw",
 			fn:   FromStdIPRaw,
 			std:  net.ParseIP("1.2.3.4"),
-			want: IPv6Raw([...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}),
+			want: IPFrom16([...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4}),
 		},
 		{
 			name: "bad-raw",
@@ -373,7 +373,7 @@ func TestFromStdIP(t *testing.T) {
 	}
 }
 
-func TestIPFrom16AndIPv6Raw(t *testing.T) {
+func TestIPFrom16(t *testing.T) {
 	tests := []struct {
 		name string
 		fn   func([16]byte) IP
@@ -381,33 +381,19 @@ func TestIPFrom16AndIPv6Raw(t *testing.T) {
 		want IP
 	}{
 		{
-			name: "v6-raw",
-			fn:   IPv6Raw,
+			name: "v6",
 			in:   [...]byte{15: 1},
 			want: IP{z: z6noz, addr: uint128{0, 1}},
 		},
 		{
-			name: "v6-from16",
-			fn:   IPFrom16,
-			in:   [...]byte{15: 1},
-			want: IP{z: z6noz, addr: uint128{0, 1}},
-		},
-		{
-			name: "v4-raw",
-			fn:   IPv6Raw,
+			name: "v4",
 			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
 			want: IP{z: z6noz, addr: uint128{0, 0xffff01020304}},
-		},
-		{
-			name: "v4-from16",
-			fn:   IPFrom16,
-			in:   [...]byte{10: 0xff, 11: 0xff, 12: 1, 13: 2, 14: 3, 15: 4},
-			want: IPv4(1, 2, 3, 4),
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := tt.fn(tt.in)
+			got := IPFrom16(tt.in)
 			if got != tt.want {
 				t.Errorf("got %#v; want %#v", got, tt.want)
 			}
@@ -907,6 +893,17 @@ func TestIs4In6(t *testing.T) {
 		u := tt.ip.Unmap()
 		if u != tt.wantUnmap {
 			t.Errorf("Unmap(%q) = %v; want %v", tt.ip, u, tt.wantUnmap)
+		}
+
+		// If Unmap did something, Map should do the inverse.
+		if tt.ip.Is4in6() {
+			m := u.Map()
+			// Unmapping strips v6 zone, so don't expect it back when we
+			// re-map.
+			want := tt.ip.WithZone("")
+			if m != want {
+				t.Errorf("Map(Unmap(%q)) = %v; want %v", tt.ip, m, want)
+			}
 		}
 	}
 }
@@ -1623,7 +1620,7 @@ func TestAs4(t *testing.T) {
 			want: [4]byte{1, 2, 3, 4},
 		},
 		{
-			ip:   IPv6Raw(mustIP("1.2.3.4").As16()), // IPv4-in-IPv6
+			ip:   mustIP("::ffff:1.2.3.4"), // IPv4-in-IPv6
 			want: [4]byte{1, 2, 3, 4},
 		},
 		{
@@ -1710,7 +1707,7 @@ func TestIPPrefixOverlaps(t *testing.T) {
 		{pfx("0100::0/8"), pfx("::1/128"), false},
 
 		// v6-mapped v4 should not overlap with IPv4.
-		{IPPrefix{IP: IPv6Raw(mustIP("1.2.0.0").As16()), Bits: 16}, pfx("1.2.3.0/24"), false},
+		{IPPrefix{IP: mustIP("::ffff:1.2.0.0"), Bits: 16}, pfx("1.2.3.0/24"), false},
 
 		// Invalid prefixes
 		{IPPrefix{IP: mustIP("1.2.3.4"), Bits: 33}, pfx("1.2.3.0/24"), false},
@@ -2753,7 +2750,7 @@ func TestIPv6Accessor(t *testing.T) {
 	for i := range a {
 		a[i] = uint8(i) + 1
 	}
-	ip := IPv6Raw(a)
+	ip := IPFrom16(a)
 	for i := range a {
 		if got, want := ip.v6(uint8(i)), uint8(i)+1; got != want {
 			t.Errorf("v6(%v) = %v; want %v", i, got, want)
@@ -2839,7 +2836,6 @@ func TestNoAllocs(t *testing.T) {
 
 	// IP constructors
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
-	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
 	test("IPFrom16", func() { sinkIP = IPFrom16([16]byte{15: 1}) })
 	test("ParseIP/4", func() { sinkIP = panicIP(ParseIP("1.2.3.4")) })
 	test("ParseIP/6", func() { sinkIP = panicIP(ParseIP("::1")) })
