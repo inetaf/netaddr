@@ -954,6 +954,10 @@ type IPPrefix struct {
 	Bits uint8
 }
 
+// Valid reports whether whether p.Bits has a valid range for p.IP.
+// If p.IP is zero, Valid returns false.
+func (p IPPrefix) Valid() bool { return !p.IP.IsZero() && p.Bits <= p.IP.BitLen() }
+
 // IsZero reports whether p is its zero value.
 func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
 
