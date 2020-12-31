@@ -47,3 +47,39 @@ func TestUint128(t *testing.T) {
 		}
 	}
 }
+
+func TestUint128AddSub(t *testing.T) {
+	const add1 = 1
+	const sub1 = -1
+	tests := []struct {
+		in   uint128
+		op   int // +1 or -1 to add vs subtract
+		want uint128
+	}{
+		{uint128{0, 0}, add1, uint128{0, 1}},
+		{uint128{0, 1}, add1, uint128{0, 2}},
+		{uint128{1, 0}, add1, uint128{1, 1}},
+		{uint128{0, ^uint64(0)}, add1, uint128{1, 0}},
+		{uint128{^uint64(0), ^uint64(0)}, add1, uint128{0, 0}},
+
+		{uint128{0, 0}, sub1, uint128{^uint64(0), ^uint64(0)}},
+		{uint128{0, 1}, sub1, uint128{0, 0}},
+		{uint128{0, 2}, sub1, uint128{0, 1}},
+		{uint128{1, 0}, sub1, uint128{0, ^uint64(0)}},
+		{uint128{1, 1}, sub1, uint128{1, 0}},
+	}
+	for _, tt := range tests {
+		var got uint128
+		switch tt.op {
+		case add1:
+			got = tt.in.addOne()
+		case sub1:
+			got = tt.in.subOne()
+		default:
+			panic("bogus op")
+		}
+		if got != tt.want {
+			t.Errorf("%v add %d = %v; want %v", tt.in, tt.op, got, tt.want)
+		}
+	}
+}

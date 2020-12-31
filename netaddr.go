@@ -1329,72 +1329,34 @@ func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) [
 	return dst
 }
 
-func addOne(a []byte, i int) bool {
-	if v := a[i]; v < 0xff {
-		a[i]++
-		return true
-	}
-	if i == 0 {
-		return false
-	}
-	a[i] = 0
-	return addOne(a, i-1)
-}
-
-func subOne(a []byte, i int) bool {
-	if v := a[i]; v > 0 {
-		a[i]--
-		return true
-	}
-	if i == 0 {
-		return false
-	}
-	a[i] = 0xff
-	return subOne(a, i-1)
-}
-
-// ipFrom16Match returns an IP address from a with address family
-// matching ip.
-func ipFrom16Match(ip IP, a [16]byte) IP {
-	if ip.Is6() {
-		return IPv6Raw(a) // doesn't unwrap
-	}
-	return IPFrom16(a)
-}
-
-func (ip IP) withInternedZone(z *intern.Value) IP {
-	ip.z = z
-	return ip
-}
-
 // Next returns the IP following ip.
 // If there is none, it returns the IP zero value.
 func (ip IP) Next() IP {
-	var ok bool
-	a := ip.As16()
+	ip.addr = ip.addr.addOne()
 	if ip.Is4() {
-		ok = addOne(a[12:], 3)
+		if uint32(ip.addr.lo) == 0 {
+			// Overflowed.
+			return IP{}
+		}
 	} else {
-		ok = addOne(a[:], 15)
+		if ip.addr.isZero() {
+			// Overflowed
+			return IP{}
+		}
 	}
-	if ok {
-		return ipFrom16Match(ip, a).withInternedZone(ip.z)
-	}
-	return IP{}
+	return ip
 }
 
 // Prior returns the IP before ip.
 // If there is none, it returns the IP zero value.
 func (ip IP) Prior() IP {
-	var ok bool
-	a := ip.As16()
 	if ip.Is4() {
-		ok = subOne(a[12:], 3)
-	} else {
-		ok = subOne(a[:], 15)
+		if uint32(ip.addr.lo) == 0 {
+			return IP{}
+		}
+	} else if ip.addr.isZero() {
+		return IP{}
 	}
-	if ok {
-		return ipFrom16Match(ip, a).withInternedZone(ip.z)
-	}
-	return IP{}
+	ip.addr = ip.addr.subOne()
+	return ip
 }

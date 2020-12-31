@@ -4,6 +4,8 @@
 
 package netaddr
 
+import "math/bits"
+
 // uint128 represents a uint128 using two uint64s.
 type uint128 struct {
 	hi uint64
@@ -30,6 +32,18 @@ func (u uint128) xor(m uint128) uint128 {
 // or returns the bitwise OR of u and m (u|m).
 func (u uint128) or(m uint128) uint128 {
 	return uint128{u.hi | m.hi, u.lo | m.lo}
+}
+
+// subOne returns u - 1.
+func (u uint128) subOne() uint128 {
+	lo, borrow := bits.Sub64(u.lo, 1, 0)
+	return uint128{u.hi - borrow, lo}
+}
+
+// addOne returns u + 1.
+func (u uint128) addOne() uint128 {
+	lo, carry := bits.Add64(u.lo, 1, 0)
+	return uint128{u.hi + carry, lo}
 }
 
 func u64CommonPrefixLen(a, b uint64) uint8 {
