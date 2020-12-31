@@ -481,7 +481,6 @@ func TestIPSetRangesStress(t *testing.T) {
 		var s IPSet
 		var want [numIPs]bool
 		// Add some ranges
-		const maxAdd = 10
 		for i := 0; i < 1+rand.Intn(2); i++ {
 			a, b, r := randRange()
 			for i := a; i <= b; i++ {
