@@ -2609,6 +2609,84 @@ func TestIPSetRangesStress(t *testing.T) {
 	}
 }
 
+func mustIPSet(ranges ...string) *IPSet {
+	ret := &IPSet{}
+	for _, str := range ranges {
+		ipr, err := ParseIPRange(str[1:])
+		if err != nil {
+			panic(err)
+		}
+		switch str[0] {
+		case '+':
+			ret.AddRange(ipr)
+		case '-':
+			ret.RemoveRange(ipr)
+		default:
+			panic(fmt.Sprintf("unknown op %q", str[0]))
+		}
+	}
+	return ret
+}
+
+func TestIPSetOverlaps(t *testing.T) {
+	tests := []struct{
+		a, b *IPSet
+		want bool
+	}{
+		{
+			mustIPSet(),
+			mustIPSet(),
+			false,
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.5"),
+			mustIPSet("+10.0.0.0-10.0.0.5"),
+			true, // exact match
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.5"),
+			mustIPSet("+10.0.0.5-10.0.0.10"),
+			true, // overlap on edge
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.5"),
+			mustIPSet("+10.0.0.3-10.0.0.7"),
+			true, // overlap in middle
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.5"),
+			mustIPSet("+10.0.0.2-10.0.0.3"),
+			true, // one inside other
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.5", "+10.1.0.0-10.1.0.5"),
+			mustIPSet("+10.1.0.1-10.1.0.2"),
+			true, // overlap in non-first
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.10", "-10.0.0.5-10.0.0.10"),
+			mustIPSet("+10.0.0.7-10.0.0.8"),
+			false, // removal cancels overlap
+		},
+		{
+			mustIPSet("+10.0.0.0-10.0.0.10", "-10.0.0.5-10.0.0.10", "+10.0.0.5-10.0.0.10"),
+			mustIPSet("+10.0.0.7-10.0.0.8"),
+			true, // removal+readd restores overlap
+		},
+	}
+
+	for _, test := range tests {
+		got := test.a.Overlaps(test.b)
+		if got != test.want {
+			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.a, test.b, got, test.want)
+		}
+		got = test.b.Overlaps(test.a)
+		if got != test.want {
+			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.b, test.a, got, test.want)
+		}
+	}
+}
+
 func TestPointLess(t *testing.T) {
 	tests := []struct {
 		a, b point
@@ -2707,7 +2785,6 @@ func TestPointLess(t *testing.T) {
 			t.Errorf("Less(%+v, %+v) both false but unequal", tt.a, tt.b)
 		}
 	}
-
 }
 
 // bitSet reports whether the given bit in the address is set.

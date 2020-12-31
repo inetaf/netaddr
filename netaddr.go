@@ -1506,11 +1506,16 @@ func (s *IPSet) AddRange(r IPRange) {
 	}
 	// If there are any removals (s.out), then we need to compact the set
 	// first to get the order right.
+	s.normalize()
+	s.in = append(s.in, r)
+}
+
+// normalize updates s by rolling s.out into s.in, and zeroing s.out.
+func (s *IPSet) normalize() {
 	if len(s.out) > 0 {
 		s.in = s.Ranges()
 		s.out = nil
 	}
-	s.in = append(s.in, r)
 }
 
 // Remove removes ip from the set s.
@@ -1717,6 +1722,21 @@ func (s *IPSet) Ranges() []IPRange {
 		})
 	}
 	return out
+}
+
+// Overlaps reports whether s and o overlap at all.
+func (s *IPSet) Overlaps(o *IPSet) bool {
+	s.normalize()
+	o.normalize()
+
+	for _, ipr := range s.in {
+		for _, opr := range o.in {
+			if ipr.Overlaps(opr) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // Prefixes returns the minimum and sorted set of IP prefixes
