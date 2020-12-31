@@ -2716,7 +2716,7 @@ func TestPointLess(t *testing.T) {
 func (u uint128) bitSet(bit uint8) bool {
 	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
 	s := 63 - (bit % 64)
-	return u[hli]&(1<<s) != 0
+	return *(u.halves()[hli])&(1<<s) != 0
 }
 
 func TestUint128(t *testing.T) {
@@ -2724,7 +2724,7 @@ func TestUint128(t *testing.T) {
 		var a [16]byte
 		rand.Read(a[:])
 		u := ipv6Slice(a[:]).addr
-		return u, fmt.Sprintf("%064b%064b", u[0], u[1])
+		return u, fmt.Sprintf("%064b%064b", u.hi, u.lo)
 	}
 
 	u128, bitStr := randU128()
