@@ -2010,24 +2010,35 @@ func BenchmarkIPRangePrefix(b *testing.B) {
 	}
 }
 
+var nextPriorTests = []struct {
+	ip    IP
+	next  IP
+	prior IP
+}{
+	{mustIP("10.0.0.1"), mustIP("10.0.0.2"), mustIP("10.0.0.0")},
+	{mustIP("10.0.0.255"), mustIP("10.0.1.0"), mustIP("10.0.0.254")},
+	{mustIP("127.0.0.1"), mustIP("127.0.0.2"), mustIP("127.0.0.0")},
+	{mustIP("254.255.255.255"), mustIP("255.0.0.0"), mustIP("254.255.255.254")},
+	{mustIP("255.255.255.255"), IP{}, mustIP("255.255.255.254")},
+	{mustIP("0.0.0.0"), mustIP("0.0.0.1"), IP{}},
+	{mustIP("::"), mustIP("::1"), IP{}},
+	{mustIP("::%x"), mustIP("::1%x"), IP{}},
+	{mustIP("::1"), mustIP("::2"), mustIP("::")},
+	{mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), IP{}, mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")},
+}
+
 func TestIPNextPrior(t *testing.T) {
-	tests := []struct {
-		ip    IP
-		next  IP
-		prior IP
-	}{
-		{mustIP("10.0.0.1"), mustIP("10.0.0.2"), mustIP("10.0.0.0")},
-		{mustIP("10.0.0.255"), mustIP("10.0.1.0"), mustIP("10.0.0.254")},
-		{mustIP("127.0.0.1"), mustIP("127.0.0.2"), mustIP("127.0.0.0")},
-		{mustIP("254.255.255.255"), mustIP("255.0.0.0"), mustIP("254.255.255.254")},
-		{mustIP("255.255.255.255"), IP{}, mustIP("255.255.255.254")},
-		{mustIP("0.0.0.0"), mustIP("0.0.0.1"), IP{}},
-		{mustIP("::"), mustIP("::1"), IP{}},
-		{mustIP("::%x"), mustIP("::1%x"), IP{}},
-		{mustIP("::1"), mustIP("::2"), mustIP("::")},
-		{mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff"), IP{}, mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:fffe")},
+	doNextPrior(t)
+}
+
+func BenchmarkIPNextPrior(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		doNextPrior(b)
 	}
-	for _, tt := range tests {
+}
+
+func doNextPrior(t testing.TB) {
+	for _, tt := range nextPriorTests {
 		gnext, gprior := tt.ip.Next(), tt.ip.Prior()
 		if gnext != tt.next {
 			t.Errorf("IP(%v).Next = %v; want %v", tt.ip, gnext, tt.next)
