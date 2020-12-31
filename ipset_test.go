@@ -466,8 +466,9 @@ func TestIPSetRangesStress(t *testing.T) {
 	} else if *long {
 		n = 500
 	}
+	const numIPs = 1 << 16 // we test lower 16 bits only
 	randRange := func() (a, b int, r IPRange) {
-		a, b = rand.Intn(0x10000), rand.Intn(0x10000)
+		a, b = rand.Intn(numIPs), rand.Intn(numIPs)
 		if a > b {
 			a, b = b, a
 		}
@@ -478,7 +479,7 @@ func TestIPSetRangesStress(t *testing.T) {
 	}
 	for i := 0; i < n; i++ {
 		var s IPSet
-		var want [0xffff]bool
+		var want [numIPs]bool
 		// Add some ranges
 		const maxAdd = 10
 		for i := 0; i < 1+rand.Intn(2); i++ {
