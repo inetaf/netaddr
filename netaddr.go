@@ -40,17 +40,16 @@ const maxUint16 = 1<<16 - 1
 // Its memory representation is 24 bytes on 64-bit machines (the same
 // size as a Go slice header) for both IPv4 and IPv6 address.
 type IP struct {
-	// addr are the hi (the first uint64) and lo bits (second
-	// uint64) of an IPv6 address. If z==z4, hi and lo contain the
-	// IPv4-mapped IPv6 address.
+	// addr are the hi and lo bits of an IPv6 address. If z==z4,
+	// hi and lo contain the IPv4-mapped IPv6 address.
 	//
 	// hi and lo are constructed by interpreting a 16-byte IPv6
 	// address as a big-endian 128-bit number. The most significant
 	// bits of that number go into hi, the rest into lo.
 	//
 	// For example, 0011:2233:4455:6677:8899:aabb:ccdd:eeff is stored as:
-	//  addr[0] (hi) = 0x0011223344556677
-	//  addr[1] (lo) = 0x8899aabbccddeeff
+	//  addr.hi = 0x0011223344556677
+	//  addr.lo = 0x8899aabbccddeeff
 	//
 	// We store IPs like this, rather than as [16]byte, because it
 	// turns most operations on IPs into arithmetic and bit-twiddling
@@ -67,9 +66,6 @@ type IP struct {
 	// Otherwise it's the interned zone name string.
 	z *intern.Value
 }
-
-func (ip IP) hi() uint64 { return ip.addr[0] }
-func (ip IP) lo() uint64 { return ip.addr[1] }
 
 // z0, z4, and z6noz are sentinel IP.z values.
 // See the IP type's field docs.
@@ -379,17 +375,17 @@ func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
 // v4 returns the i'th byte of ip. If ip is not an IPv4, v4 returns
 // unspecified garbage.
 func (ip IP) v4(i uint8) uint8 {
-	return uint8(ip.lo() >> ((3 - i) * 8))
+	return uint8(ip.addr.lo >> ((3 - i) * 8))
 }
 
 // v6 returns the i'th byte of ip. If ip is an IPv4 address, this
 // accesses the IPv4-mapped IPv6 address form of the IP.
 func (ip IP) v6(i uint8) uint8 {
-	return uint8(ip.addr[(i/8)%2] >> ((7 - i%8) * 8))
+	return uint8(*(ip.addr.halves()[(i/8)%2]) >> ((7 - i%8) * 8))
 }
 
 func (ip IP) v6u16(i uint8) uint16 {
-	return uint16(ip.addr[(i/4)%2] >> ((3 - i%4) * 16))
+	return uint16(*(ip.addr.halves()[(i/4)%2]) >> ((3 - i%4) * 16))
 }
 
 // IsZero reports whether ip is the zero value of the IP type.
@@ -436,12 +432,12 @@ func (ip IP) Compare(ip2 IP) int {
 	if f1 > f2 {
 		return 1
 	}
-	if hi1, hi2 := ip.hi(), ip2.hi(); hi1 < hi2 {
+	if hi1, hi2 := ip.addr.hi, ip2.addr.hi; hi1 < hi2 {
 		return -1
 	} else if hi1 > hi2 {
 		return 1
 	}
-	if lo1, lo2 := ip.lo(), ip2.lo(); lo1 < lo2 {
+	if lo1, lo2 := ip.addr.lo, ip2.addr.lo; lo1 < lo2 {
 		return -1
 	} else if lo1 > lo2 {
 		return 1
@@ -496,7 +492,7 @@ func (ip IP) Is4() bool {
 
 // Is4in6 reports whether ip is an IPv4-mapped IPv6 address.
 func (ip IP) Is4in6() bool {
-	return ip.Is6() && ip.hi() == 0 && ip.lo()>>32 == 0xffff
+	return ip.Is6() && ip.addr.hi == 0 && ip.addr.lo>>32 == 0xffff
 }
 
 // Is6 reports whether ip is an IPv6 address, including IPv4-mapped
@@ -551,7 +547,7 @@ func (ip IP) IsLoopback() bool {
 		return ip.v4(0) == 127
 	}
 	if ip.Is6() {
-		return ip.hi() == 0 && ip.lo() == 1
+		return ip.addr.hi == 0 && ip.addr.lo == 1
 	}
 	return false // zero value
 }
@@ -563,7 +559,7 @@ func (ip IP) IsMulticast() bool {
 		return ip.v4(0)&0xf0 == 0xe0
 	}
 	if ip.Is6() {
-		return ip.v6(0) == 0xff
+		return ip.addr.hi>>(64-8) == 0xff // ip.v6(0) == 0xff
 	}
 	return false // zero value
 }
@@ -598,8 +594,8 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 // The ip zero value returns all zeroes.
 func (ip IP) As16() [16]byte {
 	var ret [16]byte
-	binary.BigEndian.PutUint64(ret[:8], ip.hi())
-	binary.BigEndian.PutUint64(ret[8:], ip.lo())
+	binary.BigEndian.PutUint64(ret[:8], ip.addr.hi)
+	binary.BigEndian.PutUint64(ret[8:], ip.addr.lo)
 	return ret
 }
 
@@ -609,7 +605,7 @@ func (ip IP) As16() [16]byte {
 func (ip IP) As4() [4]byte {
 	if ip.z == z4 || ip.Is4in6() {
 		var ret [4]byte
-		binary.BigEndian.PutUint32(ret[:], uint32(ip.lo()))
+		binary.BigEndian.PutUint32(ret[:], uint32(ip.addr.lo))
 		return ret
 	}
 	if ip.z == z0 {
@@ -1075,12 +1071,12 @@ func (p IPPrefix) Contains(ip IP) bool {
 	}
 	if ip.Is4() {
 		m := mask4(p.Bits)
-		return uint32(ip.lo())&m == uint32(p.IP.lo())&m
+		return uint32(ip.addr.lo)&m == uint32(p.IP.addr.lo)&m
 	} else {
 		m := mask6(p.Bits)
 		// TODO: benchmark whether the short circuit below is faster or slower
 		// than the higher level alternative: 'ip.addr.and(m) == p.IP.addr.and(m)'.
-		return ip.hi()&m[0] == p.IP.hi()&m[0] && ip.lo()&m[1] == p.IP.lo()&m[1]
+		return ip.addr.hi&m.hi == p.IP.addr.hi&m.hi && ip.addr.lo&m.lo == p.IP.addr.lo&m.lo
 	}
 }
 
@@ -1268,22 +1264,24 @@ func (r IPRange) Overlaps(o IPRange) bool {
 }
 
 // uint128 represents a uint128 using two uint64s.
-// Index 0 contains the high bits, index 1 contains the low.
-type uint128 [2]uint64
+type uint128 struct {
+	hi uint64
+	lo uint64
+}
 
 // and returns the bitwise AND of u and m (u&m).
 func (u uint128) and(m uint128) uint128 {
-	return uint128{u[0] & m[0], u[1] & m[1]}
+	return uint128{u.hi & m.hi, u.lo & m.lo}
 }
 
 // xor returns the bitwise XOR of u and m (u^m).
 func (u uint128) xor(m uint128) uint128 {
-	return uint128{u[0] ^ m[0], u[1] ^ m[1]}
+	return uint128{u.hi ^ m.hi, u.lo ^ m.lo}
 }
 
 // or returns the bitwise OR of u and m (u|m).
 func (u uint128) or(m uint128) uint128 {
-	return uint128{u[0] | m[0], u[1] | m[1]}
+	return uint128{u.hi | m.hi, u.lo | m.lo}
 }
 
 func u64CommonPrefixLen(a, b uint64) uint8 {
@@ -1298,22 +1296,26 @@ func u64CommonPrefixLen(a, b uint64) uint8 {
 }
 
 func (a uint128) commonPrefixLen(b uint128) (n uint8) {
-	if n = u64CommonPrefixLen(a[0], b[0]); n == 64 {
-		n += u64CommonPrefixLen(a[1], b[1])
+	if n = u64CommonPrefixLen(a.hi, b.hi); n == 64 {
+		n += u64CommonPrefixLen(a.lo, b.lo)
 	}
 	return
+}
+
+func (u *uint128) halves() [2]*uint64 {
+	return [2]*uint64{&u.hi, &u.lo}
 }
 
 func (u *uint128) set(bit uint8) {
 	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
 	s := 63 - (bit % 64)
-	u[hli] |= 1 << s
+	*(u.halves()[hli]) |= 1 << s
 }
 
 func (u *uint128) clear(bit uint8) {
 	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
 	s := 63 - (bit % 64)
-	u[hli] &^= 1 << s
+	*(u.halves()[hli]) &^= 1 << s
 }
 
 // lastWithBitZero returns a copy of u with the given bit
