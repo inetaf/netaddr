@@ -86,6 +86,7 @@ func TestInlining(t *testing.T) {
 		"mask4",
 		"mask6",
 		"uint128.and",
+		"uint128.isZero",
 		"uint128.or",
 		"uint128.xor",
 		"appendDecimal",

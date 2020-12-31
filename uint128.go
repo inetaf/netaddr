@@ -10,6 +10,13 @@ type uint128 struct {
 	lo uint64
 }
 
+// isZero reports whether u == 0.
+//
+// It's faster than u == (uint128{}) because the compiler (as of Go
+// 1.15/1.16b1) doesn't do this trick and instead inserts a branch in
+// its eq alg's generated code.
+func (u uint128) isZero() bool { return u.hi|u.lo == 0 }
+
 // and returns the bitwise AND of u and m (u&m).
 func (u uint128) and(m uint128) uint128 {
 	return uint128{u.hi & m.hi, u.lo & m.lo}

@@ -1300,7 +1300,7 @@ func comparePrefixes(a, b uint128) (common uint8, aZeroBSet bool) {
 	}
 
 	m := mask6(common)
-	return common, (a.xor(a.and(m)) == uint128{} &&
+	return common, (a.xor(a.and(m)).isZero() &&
 		b.or(m) == uint128{^uint64(0), ^uint64(0)})
 }
 
