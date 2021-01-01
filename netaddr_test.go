@@ -1484,6 +1484,15 @@ func BenchmarkIPv4Contains(b *testing.B) {
 	}
 }
 
+func BenchmarkIPv6Contains(b *testing.B) {
+	b.ReportAllocs()
+	prefix := MustParseIPPrefix("::1/128")
+	ip := MustParseIP("::1")
+	for i := 0; i < b.N; i++ {
+		prefix.Contains(ip)
+	}
+}
+
 var parseBenchInputs = []struct {
 	name string
 	ip   string
