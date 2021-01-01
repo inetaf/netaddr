@@ -521,7 +521,7 @@ func (ip IP) WithZone(zone string) IP {
 		ip.z = z6noz
 		return ip
 	}
-	ip.z = intern.Get(zone)
+	ip.z = intern.GetByString(zone)
 	return ip
 }
 
