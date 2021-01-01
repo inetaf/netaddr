@@ -2246,7 +2246,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IP.BitLen", func() { sinkBool = MustParseIP("1.2.3.4").BitLen() == 8 })
 	test("IP.Zone/4", func() { sinkBool = MustParseIP("1.2.3.4").Zone() == "" })
 	test("IP.Zone/6", func() { sinkBool = MustParseIP("fe80::1").Zone() == "" })
-	// No IP.Zone/6+zone, because that does allocate currently.
+	test("IP.Zone/6zone", func() { sinkBool = MustParseIP("fe80::1%zone").Zone() == "" })
 	test("IP.Compare", func() {
 		a := MustParseIP("1.2.3.4")
 		b := MustParseIP("2.3.4.5")
