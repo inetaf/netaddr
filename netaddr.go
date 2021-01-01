@@ -1070,10 +1070,11 @@ func (p IPPrefix) Contains(ip IP) bool {
 		// If all the bits we care about are equal, the result will be zero.
 		return uint32((ip.addr.lo^p.IP.addr.lo)>>((32-p.Bits)&63)) == 0
 	} else {
+		// xor the IP addresses together.
+		// Mask away the bits we don't care about.
+		// If all the bits we care about are equal, the result will be zero.
 		m := mask6(p.Bits)
-		// TODO: benchmark whether the short circuit below is faster or slower
-		// than the higher level alternative: 'ip.addr.and(m) == p.IP.addr.and(m)'.
-		return ip.addr.hi&m.hi == p.IP.addr.hi&m.hi && ip.addr.lo&m.lo == p.IP.addr.lo&m.lo
+		return ip.addr.xor(p.IP.addr).and(m).isZero()
 	}
 }
 
