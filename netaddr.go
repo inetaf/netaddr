@@ -1324,8 +1324,8 @@ func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) [
 		return append(dst, makePrefix(a, common))
 	}
 	// Otherwise recursively do both halves.
-	dst = appendRangePrefixes(dst, makePrefix, a, a.lastWithBitZero(common+1))
-	dst = appendRangePrefixes(dst, makePrefix, b.firstWithBitOne(common+1), b)
+	dst = appendRangePrefixes(dst, makePrefix, a, a.bitsSetFrom(common+1))
+	dst = appendRangePrefixes(dst, makePrefix, b.bitsClearedFrom(common+1), b)
 	return dst
 }
 

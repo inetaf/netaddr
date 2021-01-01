@@ -7,6 +7,9 @@ package netaddr
 import "math/bits"
 
 // uint128 represents a uint128 using two uint64s.
+//
+// When the methods below mention a bit number, bit 0 is the most
+// significant bit (in hi) bit, and bit 127 is the lowest (lo&1).
 type uint128 struct {
 	hi uint64
 	lo uint64
@@ -80,20 +83,18 @@ func (u *uint128) clear(bit uint8) {
 	*(u.halves()[hli]) &^= 1 << s
 }
 
-// lastWithBitZero returns a copy of u with the given bit
-// cleared and the following all set.
-func (u uint128) lastWithBitZero(bit uint8) uint128 {
-	u.clear(bit)
+// bitsSetFrom returns a copy of u with the given bit
+// and all subsequent ones set.
+func (u uint128) bitsSetFrom(bit uint8) uint128 {
 	for ; bit < 128; bit++ {
 		u.set(bit)
 	}
 	return u
 }
 
-// firstWithBitOne returns a copy of u with the given bit
-// set and the following all cleared.
-func (u uint128) firstWithBitOne(bit uint8) uint128 {
-	u.set(bit)
+// bitsClearedFrom returns a copy of u with the given bit
+// and all subsequent ones set.
+func (u uint128) bitsClearedFrom(bit uint8) uint128 {
 	for ; bit < 128; bit++ {
 		u.clear(bit)
 	}
