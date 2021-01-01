@@ -50,14 +50,7 @@ func (u uint128) addOne() uint128 {
 }
 
 func u64CommonPrefixLen(a, b uint64) uint8 {
-	for i := uint8(0); i < 64; i++ {
-		if a == b {
-			return 64 - i
-		}
-		a >>= 1
-		b >>= 1
-	}
-	return 0
+	return uint8(bits.LeadingZeros64(a ^ b))
 }
 
 func (a uint128) commonPrefixLen(b uint128) (n uint8) {
