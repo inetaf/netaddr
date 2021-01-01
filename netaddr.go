@@ -1037,12 +1037,6 @@ func (p IPPrefix) IPNet() *net.IPNet {
 	}
 }
 
-// mask4 returns a bit mask that selects the topmost n bits of a
-// uint32.
-func mask4(n uint8) uint32 {
-	return ^uint32(0) << (32 - n)
-}
-
 // mask6 returns a bit mask that selects the topmost n bits of a
 // 128-bit number.
 func mask6(n uint8) uint128 {
@@ -1066,8 +1060,15 @@ func (p IPPrefix) Contains(ip IP) bool {
 		return false
 	}
 	if ip.Is4() {
-		m := mask4(p.Bits)
-		return uint32(ip.addr.lo)&m == uint32(p.IP.addr.lo)&m
+		// xor the IP addresses together; mismatched bits are now ones.
+		// Shift away the number of bits we don't care about.
+		// Shifts in Go are more efficient if the compiler can prove
+		// that the shift amount is smaller than the width of the shifted type (64 here).
+		// We know that p.Bits is in the range 0..32 because p is Valid;
+		// the compiler doesn't know that, so mask with 63 to help it.
+		// Now truncate to 32 bits, because this is IPv4.
+		// If all the bits we care about are equal, the result will be zero.
+		return uint32((ip.addr.lo^p.IP.addr.lo)>>((32-p.Bits)&63)) == 0
 	} else {
 		m := mask6(p.Bits)
 		// TODO: benchmark whether the short circuit below is faster or slower

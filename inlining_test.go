@@ -84,7 +84,6 @@ func TestInlining(t *testing.T) {
 		"MustParseIPPort",
 		"MustParseIPPrefix",
 		"discardf",
-		"mask4",
 		"mask6",
 		"uint128.addOne",
 		"uint128.and",
