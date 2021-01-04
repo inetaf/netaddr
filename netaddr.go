@@ -580,7 +580,7 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 			return IPPrefix{}, fmt.Errorf("prefix length %d too large for IPv6", bits)
 		}
 	}
-	ip.addr = ip.addr.and(mask6(effectiveBits))
+	ip.addr = ip.addr.and(mask6[effectiveBits])
 	return IPPrefix{ip, bits}, nil
 }
 
@@ -1037,16 +1037,6 @@ func (p IPPrefix) IPNet() *net.IPNet {
 	}
 }
 
-// mask6 returns a bit mask that selects the topmost n bits of a
-// 128-bit number.
-func mask6(n uint8) uint128 {
-	if n > 64 {
-		return uint128{^uint64(0), ^uint64(0) << (128 - n)}
-	} else {
-		return uint128{^uint64(0) << (64 - n), 0}
-	}
-}
-
 // Contains reports whether the network p includes ip.
 //
 // An IPv4 address will not match an IPv6 prefix.
@@ -1073,8 +1063,7 @@ func (p IPPrefix) Contains(ip IP) bool {
 		// xor the IP addresses together.
 		// Mask away the bits we don't care about.
 		// If all the bits we care about are equal, the result will be zero.
-		m := mask6(p.Bits)
-		return ip.addr.xor(p.IP.addr).and(m).isZero()
+		return ip.addr.xor(p.IP.addr).and(mask6[p.Bits]).isZero()
 	}
 }
 
@@ -1310,7 +1299,7 @@ func comparePrefixes(a, b uint128) (common uint8, aZeroBSet bool) {
 		return common, true
 	}
 
-	m := mask6(common)
+	m := mask6[common]
 	return common, (a.xor(a.and(m)).isZero() &&
 		b.or(m) == uint128{^uint64(0), ^uint64(0)})
 }

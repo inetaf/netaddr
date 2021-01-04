@@ -37,6 +37,11 @@ func (u uint128) or(m uint128) uint128 {
 	return uint128{u.hi | m.hi, u.lo | m.lo}
 }
 
+// not returns the bitwise NOT of u.
+func (u uint128) not() uint128 {
+	return uint128{^u.hi, ^u.lo}
+}
+
 // subOne returns u - 1.
 func (u uint128) subOne() uint128 {
 	lo, borrow := bits.Sub64(u.lo, 1, 0)
@@ -64,40 +69,14 @@ func (u *uint128) halves() [2]*uint64 {
 	return [2]*uint64{&u.hi, &u.lo}
 }
 
-func (u *uint128) set(bit uint8) {
-	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
-	s := 63 - (bit % 64)
-	*(u.halves()[hli]) |= 1 << s
-}
-
-func (u *uint128) clear(bit uint8) {
-	hli := (bit / 64) % 2 // hi/lo index: 0 or 1, respectively
-	s := 63 - (bit % 64)
-	*(u.halves()[hli]) &^= 1 << s
-}
-
 // bitsSetFrom returns a copy of u with the given bit
 // and all subsequent ones set.
 func (u uint128) bitsSetFrom(bit uint8) uint128 {
-	if bit <= 64 {
-		u.hi |= 1<<(64-bit) - 1
-		u.lo = ^uint64(0)
-	} else {
-		u.lo |= 1<<(128-bit) - 1
-	}
-	return u
+	return u.or(mask6[bit].not())
 }
 
 // bitsClearedFrom returns a copy of u with the given bit
 // and all subsequent ones cleared.
 func (u uint128) bitsClearedFrom(bit uint8) uint128 {
-	if bit <= 64 {
-		u.hi >>= 64 - bit
-		u.hi <<= 64 - bit
-		u.lo = 0
-	} else {
-		u.lo >>= 128 - bit
-		u.lo <<= 128 - bit
-	}
-	return u
+	return u.and(mask6[bit])
 }
