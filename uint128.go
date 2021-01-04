@@ -86,17 +86,25 @@ func (u *uint128) clear(bit uint8) {
 // bitsSetFrom returns a copy of u with the given bit
 // and all subsequent ones set.
 func (u uint128) bitsSetFrom(bit uint8) uint128 {
-	for ; bit < 128; bit++ {
-		u.set(bit)
+	if bit <= 64 {
+		u.hi |= 1<<(64-bit) - 1
+		u.lo = ^uint64(0)
+	} else {
+		u.lo |= 1<<(128-bit) - 1
 	}
 	return u
 }
 
 // bitsClearedFrom returns a copy of u with the given bit
-// and all subsequent ones set.
+// and all subsequent ones cleared.
 func (u uint128) bitsClearedFrom(bit uint8) uint128 {
-	for ; bit < 128; bit++ {
-		u.clear(bit)
+	if bit <= 64 {
+		u.hi >>= 64 - bit
+		u.hi <<= 64 - bit
+		u.lo = 0
+	} else {
+		u.lo >>= 128 - bit
+		u.lo <<= 128 - bit
 	}
 	return u
 }
