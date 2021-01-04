@@ -91,6 +91,7 @@ func TestInlining(t *testing.T) {
 		"uint128.or",
 		"uint128.subOne",
 		"uint128.xor",
+		"uint128.bitsClearedFrom",
 		"appendDecimal",
 		"appendHex",
 	} {
