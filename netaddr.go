@@ -1275,11 +1275,20 @@ type prefixMaker func(a uint128, bits uint8) IPPrefix
 //
 // If either of r's bounds are invalid, in the wrong order, or if
 // they're of different address families, then Prefixes returns nil.
+//
+// Prefixes necessarily allocates. See AppendPrefixes for a version that uses
+// memory you provide.
 func (r IPRange) Prefixes() []IPPrefix {
+	return r.AppendPrefixes(nil)
+}
+
+// AppendPrefixes is an append version of IPRange.Prefixes. It appends
+// the IPPrefix entries that cover r to dst.
+func (r IPRange) AppendPrefixes(dst []IPPrefix) []IPPrefix {
 	if !r.Valid() {
 		return nil
 	}
-	return appendRangePrefixes(nil, r.prefixFrom128AndBits, r.From.addr, r.To.addr)
+	return appendRangePrefixes(dst, r.prefixFrom128AndBits, r.From.addr, r.To.addr)
 }
 
 func (r IPRange) prefixFrom128AndBits(a uint128, bits uint8) IPPrefix {

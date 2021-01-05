@@ -1819,6 +1819,15 @@ func TestRangePrefixes(t *testing.T) {
 	}
 }
 
+func BenchmarkIPRangePrefixes(b *testing.B) {
+	b.ReportAllocs()
+	buf := make([]IPPrefix, 0, 50)
+	r := IPRange{mustIP("1.2.3.5"), mustIP("5.6.7.8")}
+	for i := 0; i < b.N; i++ {
+		_ = r.AppendPrefixes(buf[:0])
+	}
+}
+
 func TestParseIPRange(t *testing.T) {
 	tests := []struct {
 		in   string
