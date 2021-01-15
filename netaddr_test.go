@@ -118,6 +118,13 @@ func TestParseIP(t *testing.T) {
 			ipaddr: &net.IPAddr{IP: net.ParseIP("1:2::ffff:192.168.140.255"), Zone: "eth1"},
 			str:    "1:2::ffff:c0a8:8cff%eth1",
 		},
+		// IPv6 with capital letters.
+		{
+			in:     "FD9E:1A04:F01D::1",
+			ip:     IP{uint128{0xfd9e1a04f01d0000, 0x1}, z6noz},
+			ipaddr: &net.IPAddr{IP: net.ParseIP("FD9E:1A04:F01D::1")},
+			str:    "fd9e:1a04:f01d::1",
+		},
 	}
 
 	for _, test := range validIPs {
@@ -258,6 +265,18 @@ func TestParseIP(t *testing.T) {
 		"fe80:tail:scal:e::",
 		// IPv6 with a zone delimiter but no zone.
 		"fe80::1%",
+		// IPv6 (without ellipsis) with too many fields for trailing embedded IPv4.
+		"ffff:ffff:ffff:ffff:ffff:ffff:ffff:192.168.140.255",
+		// IPv6 (with ellipsis) with too many fields for trailing embedded IPv4.
+		"ffff::ffff:ffff:ffff:ffff:ffff:ffff:192.168.140.255",
+		// IPv6 with invalid embedded IPv4.
+		"::ffff:192.168.140.bad",
+		// IPv6 with multiple ellipsis ::.
+		"fe80::1::1",
+		// IPv6 with invalid non hex/colon character.
+		"fe80:1?:1",
+		// IPv6 with truncated bytes after single colon.
+		"fe80:",
 	}
 
 	for _, s := range invalidIPs {
