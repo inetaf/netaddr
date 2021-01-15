@@ -1640,6 +1640,10 @@ func TestAs4(t *testing.T) {
 			want: [4]byte{0, 0, 0, 0},
 		},
 		{
+			ip:        IP{},
+			wantPanic: true,
+		},
+		{
 			ip:        mustIP("::1"),
 			wantPanic: true,
 		},
