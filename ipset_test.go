@@ -226,6 +226,82 @@ func TestIPSet(t *testing.T) {
 			},
 			wantPrefixes: pxv("10.0.0.0/30"),
 		},
+		{
+			name: "invert_empty",
+			f: func(s *IPSet) {
+				s.Complement()
+			},
+			wantRanges: []IPRange{
+				{mustIP("0.0.0.0"), mustIP("255.255.255.255")},
+				{mustIP("::"), mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")},
+			},
+			wantPrefixes: pxv("0.0.0.0/0", "::/0"),
+		},
+		{
+			name: "invert_full",
+			f: func(s *IPSet) {
+				s.AddPrefix(mustIPPrefix("0.0.0.0/0"))
+				s.AddPrefix(mustIPPrefix("::/0"))
+				s.Complement()
+			},
+			wantRanges:   []IPRange{},
+			wantPrefixes: pxv(),
+		},
+		{
+			name: "invert_partial",
+			f: func(s *IPSet) {
+				s.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
+				s.Add(mustIP("3.3.3.3"))
+				s.AddPrefix(mustIPPrefix("4.4.4.0/24"))
+				s.Add(mustIP("1::1"))
+				s.Complement()
+			},
+			wantRanges: []IPRange{
+				{mustIP("0.0.0.0"), mustIP("1.1.1.0")},
+				{mustIP("2.2.2.3"), mustIP("3.3.3.2")},
+				{mustIP("3.3.3.4"), mustIP("4.4.3.255")},
+				{mustIP("4.4.5.0"), mustIP("255.255.255.255")},
+				{mustIP("::"), mustIP("1::")},
+				{mustIP("1::2"), mustIP("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")},
+			},
+		},
+		{
+			name: "intersect",
+			f: func(s *IPSet) {
+				var t IPSet
+				t.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("3.3.3.3")})
+
+				s.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("4.4.4.4")})
+				s.Intersect(&t)
+			},
+			wantRanges: []IPRange{
+				{mustIP("2.2.2.2"), mustIP("3.3.3.3")},
+			},
+		},
+		{
+			name: "intersect_disjoint",
+			f: func(s *IPSet) {
+				var t IPSet
+				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
+
+				s.AddRange(IPRange{mustIP("3.3.3.3"), mustIP("4.4.4.4")})
+				s.Intersect(&t)
+			},
+			wantRanges: []IPRange{},
+		},
+		{
+			name: "intersect_partial",
+			f: func(s *IPSet) {
+				var t IPSet
+				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("3.3.3.3")})
+
+				s.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("4.4.4.4")})
+				s.Intersect(&t)
+			},
+			wantRanges: []IPRange{
+				{mustIP("2.2.2.2"), mustIP("3.3.3.3")},
+			},
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -236,7 +312,6 @@ func TestIPSet(t *testing.T) {
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
 				for _, v := range got {
-					debugf("%s -> %s", v.From, v.To)
 					if !v.Valid() {
 						t.Errorf("invalid IPRange in result: %s -> %s", v.From, v.To)
 					}

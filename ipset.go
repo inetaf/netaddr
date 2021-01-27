@@ -22,6 +22,21 @@ type IPSet struct {
 	out []IPRange
 }
 
+// toInOnly updates s to clear s.out, by merging any s.out into s.in.
+func (s *IPSet) toInOnly() {
+	if len(s.out) > 0 {
+		s.in = s.Ranges()
+		s.out = nil
+	}
+}
+
+// Clone returns a copy of s that shares no memory with s.
+func (s *IPSet) Clone() *IPSet {
+	return &IPSet{
+		in: s.Ranges(),
+	}
+}
+
 // Add adds ip to the set s.
 func (s *IPSet) Add(ip IP) { s.AddRange(IPRange{ip, ip}) }
 
@@ -35,10 +50,7 @@ func (s *IPSet) AddRange(r IPRange) {
 	}
 	// If there are any removals (s.out), then we need to compact the set
 	// first to get the order right.
-	if len(s.out) > 0 {
-		s.in = s.Ranges()
-		s.out = nil
-	}
+	s.toInOnly()
 	s.in = append(s.in, r)
 }
 
@@ -97,6 +109,24 @@ func (s *IPSet) RemoveSet(b *IPSet) {
 	for _, r := range b.Ranges() {
 		s.RemoveRange(r)
 	}
+}
+
+// Complement updates s to contain the complement of its current
+// contents.
+func (s *IPSet) Complement() {
+	s.toInOnly()
+	s.out = s.in
+	s.in = []IPRange{
+		IPPrefix{IP: IPv4(0, 0, 0, 0), Bits: 0}.Range(),
+		IPPrefix{IP: IPv6Unspecified(), Bits: 0}.Range(),
+	}
+}
+
+// Intersect updates s to the set intersection of s and b.
+func (s *IPSet) Intersect(b *IPSet) {
+	b = b.Clone()
+	b.Complement()
+	s.RemoveSet(b)
 }
 
 func discardf(format string, args ...interface{}) {}
