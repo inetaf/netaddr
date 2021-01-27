@@ -219,6 +219,11 @@ func TestIPSet(t *testing.T) {
 			tt.f(&s)
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
+				for _, v := range got {
+					if !v.Valid() {
+						t.Errorf("invalid IPRange in result: %s -> %s", v.From, v.To)
+					}
+				}
 				if reflect.DeepEqual(got, tt.wantRanges) {
 					return
 				}
