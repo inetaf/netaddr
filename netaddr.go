@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -454,6 +455,8 @@ func (ip IP) Compare(ip2 IP) int {
 // IP addresses sort first by length, then their address.
 // IPv6 addresses with zones sort just after the same address without a zone.
 func (ip IP) Less(ip2 IP) bool { return ip.Compare(ip2) == -1 }
+
+func (ip IP) lessOrEq(ip2 IP) bool { return ip.Compare(ip2) <= 0 }
 
 // ipZone returns the standard library net.IP from ip, as well
 // as the zone.
@@ -1243,6 +1246,101 @@ func (r IPRange) Contains(addr IP) bool {
 // contains is like Contains, but without the validity check. For internal use.
 func (r IPRange) contains(addr IP) bool {
 	return r.From.Compare(addr) <= 0 && r.To.Compare(addr) >= 0
+}
+
+// less returns whether r is "before" other. It is before if r.From is
+// before other.From, or if they're equal, the shorter range is
+// before.
+func (r IPRange) less(other IPRange) bool {
+	if cmp := r.From.Compare(other.From); cmp != 0 {
+		return cmp < 0
+	}
+	return r.To.Less(other.To)
+}
+
+// entirelyBefore returns whether r lies entirely before other in IP
+// space.
+func (r IPRange) entirelyBefore(other IPRange) bool {
+	return r.To.Less(other.From)
+}
+
+// entirelyWithin returns whether r is entirely contained within
+// other.
+func (r IPRange) coveredBy(other IPRange) bool {
+	return other.From.lessOrEq(r.From) && r.To.lessOrEq(other.To)
+}
+
+// inMiddleOf returns whether r is inside other, but not touching the
+// edges of other.
+func (r IPRange) inMiddleOf(other IPRange) bool {
+	return other.From.Less(r.From) && r.To.Less(other.To)
+}
+
+// overlapsStartOf returns whether r entirely overlaps the start of
+// other, but not all of other.
+func (r IPRange) overlapsStartOf(other IPRange) bool {
+	return r.From.lessOrEq(other.From) && r.To.Less(other.To)
+}
+
+// overlapsEndOf returns whether r entirely overlaps the end of
+// other, but not all of other.
+func (r IPRange) overlapsEndOf(other IPRange) bool {
+	return other.From.Less(r.From) && other.To.lessOrEq(r.To)
+}
+
+// mergeIPRanges returns the minimum and sorted set of IP ranges that
+// cover r.
+func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
+	// Always return a copy of r, to avoid aliasing slice memory in
+	// the caller.
+	switch len(rr) {
+	case 0:
+		return nil, true
+	case 1:
+		return []IPRange{rr[0]}, true
+	}
+
+	sort.Slice(rr, func(i, j int) bool { return rr[i].less(rr[j]) })
+	out = make([]IPRange, 1, len(rr))
+	out[0] = rr[0]
+	for _, r := range rr[1:] {
+		prev := &out[len(out)-1]
+		switch {
+		case !r.Valid():
+			// Invalid ranges make no sense to merge, refuse to
+			// perform.
+			return nil, false
+		case prev.To.Next() == r.From:
+			// prev and r touch, merge them.
+			//
+			//   prev     r
+			// f------tf-----t
+			prev.To = r.To
+		case prev.To.Less(r.From):
+			// No overlap and not adjacent (per previous case), no
+			// merging possible.
+			//
+			//   prev       r
+			// f------t  f-----t
+			out = append(out, r)
+		case prev.To.Less(r.To):
+			// Partial overlap, update prev
+			//
+			//   prev
+			// f------t
+			//     f-----t
+			//        r
+			prev.To = r.To
+		default:
+			// r entirely contained in prev, nothing to do.
+			//
+			//    prev
+			// f--------t
+			//  f-----t
+			//     r
+		}
+	}
+	return out, true
 }
 
 // Overlaps reports whether p and o overlap at all.

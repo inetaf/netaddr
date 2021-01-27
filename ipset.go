@@ -99,154 +99,137 @@ func (s *IPSet) RemoveSet(b *IPSet) {
 	}
 }
 
-// point is either the start or end of IP range of wanted or unwanted
-// IPs.
-// This is used by the implementation of IPSet.Ranges.
-type point struct {
-	ip    IP
-	want  bool // true for 'add', false for remove
-	start bool // true for start of range, false for (inclusive) end
-}
-
-// Less sorts points by the needs of the IPSet.Ranges function.
-// See also comments in netaddr_test.go's TestPointLess.
-func (a point) Less(b point) bool {
-	cmp := a.ip.Compare(b.ip)
-	if cmp != 0 {
-		return cmp < 0
-	}
-	if a.want != b.want {
-		if a.start == b.start {
-			return !a.want
-		}
-		return a.start
-	}
-	if a.start != b.start {
-		return a.start
-	}
-	return false
-}
-
 func discardf(format string, args ...interface{}) {}
 
 // debugf is reassigned by tests.
 var debugf = discardf
 
-func debugLogPoints(points []point) {
-	for _, p := range points {
-		emo := "✅"
-		if !p.want {
-			emo = "❌"
-		}
-		if p.start {
-			debugf(" {  %-15s %s\n", p.ip, emo)
-		} else {
-			debugf("  } %-15s %s\n", p.ip, emo)
-		}
-	}
-}
-
 // Ranges returns the minimum and sorted set of IP
 // ranges that covers s.
 func (s *IPSet) Ranges() []IPRange {
-	var points []point
-	for _, r := range s.in {
-		points = append(points, point{r.From, true, true}, point{r.To, true, false})
-	}
-	for _, r := range s.out {
-		points = append(points, point{r.From, false, true}, point{r.To, false, false})
-	}
-	sort.Slice(points, func(i, j int) bool { return points[i].Less(points[j]) })
 	const debug = false
 	if debug {
-		debugf("post-sort:")
-		debugLogPoints(points)
-		debugf("merging...")
+		debugf("ranges start in=%v out=%v", s.in, s.out)
 	}
-
-	// Now build 'want', like points but with "remove" ranges removed
-	// and adjacent blocks merged, and all elements alternating between
-	// start and end.
-	want := points[:0]
-	var addDepth, removeDepth int
-	for i, p := range points {
-		depth := &addDepth
-		if !p.want {
-			depth = &removeDepth
-		}
-		if p.start {
-			*depth++
-		} else {
-			*depth--
-		}
-		if debug {
-			debugf("at[%d] (%+v), add=%v, remove=%v", i, p, addDepth, removeDepth)
-		}
-		if p.start && *depth != 1 {
-			continue
-		}
-		if !p.start && *depth != 0 {
-			continue
-		}
-		if !p.want && addDepth > 0 {
-			if p.start {
-				// If we're transitioning from a range of
-				// addresses we want to ones we don't, insert
-				// an end marker for the IP before the one we
-				// don't.
-				want = append(want, point{
-					ip:    p.ip.Prior(),
-					want:  true,
-					start: false,
-				})
-			} else {
-				want = append(want, point{
-					ip:    p.ip.Next(),
-					want:  true,
-					start: true,
-				})
-			}
-		}
-		if !p.want || removeDepth > 0 {
-			continue
-		}
-		// Merge adjacent ranges. Remove prior and skip this
-		// start.
-		if p.start && len(want) > 0 {
-			prior := &want[len(want)-1]
-			if !prior.start && prior.ip == p.ip.Prior() {
-				want = want[:len(want)-1]
-				continue
-			}
-		}
-		want = append(want, p)
+	in, ok := mergeIPRanges(s.in)
+	if !ok {
+		return nil
+	}
+	out, ok := mergeIPRanges(s.out)
+	if !ok {
+		return nil
 	}
 	if debug {
-		debugf("post-merge:")
-		debugLogPoints(want)
+		debugf("ranges sort  in=%v out=%v", in, out)
 	}
 
-	if len(want)%2 == 1 {
-		panic("internal error; odd number")
+	// in and out are sorted in ascending range order, and have no
+	// overlaps within each other. We can run a merge of the two lists
+	// in one pass.
+
+	ret := make([]IPRange, 0, len(in))
+	for len(in) > 0 && len(out) > 0 {
+		rin, rout := in[0], out[0]
+		if debug {
+			debugf("step in=%v out=%v", rin, rout)
+		}
+
+		switch {
+		case !rout.Valid() || !rin.Valid():
+			// mergeIPRanges should have prevented invalid ranges from
+			// sneaking in.
+			panic("invalid IPRanges during Ranges merge")
+		case rout.entirelyBefore(rin):
+			// "out" is entirely before "in".
+			//
+			//    out         in
+			// f-------t   f-------t
+			out = out[1:]
+			if debug {
+				debugf("out before in; drop out")
+			}
+		case rin.entirelyBefore(rout):
+			// "in" is entirely before "out".
+			//
+			//    in         out
+			// f------t   f-------t
+			ret = append(ret, rin)
+			in = in[1:]
+			if debug {
+				debugf("in before out; append in")
+				debugf("ret=%v", ret)
+			}
+		case rin.coveredBy(rout):
+			// "out" entirely covers "in".
+			//
+			//       out
+			// f-------------t
+			//    f------t
+			//       in
+			in = in[1:]
+			if debug {
+				debugf("in inside out; drop in")
+			}
+		case rout.inMiddleOf(rin):
+			// "in" entirely covers "out".
+			//
+			//       in
+			// f-------------t
+			//    f------t
+			//       out
+			ret = append(ret, IPRange{From: rin.From, To: rout.From.Prior()})
+			// Adjust in[0], not ir, because we want to consider the
+			// mutated range on the next iteration.
+			in[0].From = rout.To.Next()
+			out = out[1:]
+			if debug {
+				debugf("out inside in; split in, append first in, drop out, adjust second in")
+				debugf("ret=%v", ret)
+			}
+		case rout.overlapsStartOf(rin):
+			// "out" overlaps start of "in".
+			//
+			//   out
+			// f------t
+			//    f------t
+			//       in
+			in[0].From = rout.To.Next()
+			// Can't move ir onto ret yet, another later out might
+			// trim it further. Just discard or and continue.
+			out = out[1:]
+			if debug {
+				debugf("out cuts start of in; adjust in, drop out")
+			}
+		case rout.overlapsEndOf(rin):
+			// "out" overlaps end of "in".
+			//
+			//           out
+			//        f------t
+			//    f------t
+			//       in
+			ret = append(ret, IPRange{From: rin.From, To: rout.From.Prior()})
+			in = in[1:]
+			if debug {
+				debugf("merge out cuts end of in; append shortened in")
+				debugf("ret=%v", ret)
+			}
+		default:
+			// The above should account for all combinations of in and
+			// out overlapping, but insert a panic to be sure.
+			panic("unexpected additional overlap scenario")
+		}
+	}
+	if len(in) > 0 {
+		// Ran out of removals before the end of in.
+		ret = append(ret, in...)
+		if debug {
+			debugf("ret=%v", ret)
+		}
 	}
 
-	out := make([]IPRange, 0, len(want)/2)
-	for i := 0; i < len(want); i += 2 {
-		if !want[i].want {
-			panic("internal error; non-want in range")
-		}
-		if !want[i].start {
-			panic("internal error; odd not start")
-		}
-		if want[i+1].start {
-			panic("internal error; even not end")
-		}
-		out = append(out, IPRange{
-			From: want[i].ip,
-			To:   want[i+1].ip,
-		})
-	}
-	return out
+	// TODO: possibly update s.in and s.out, if #110 supports that.
+
+	return ret
 }
 
 // Prefixes returns the minimum and sorted set of IP prefixes
