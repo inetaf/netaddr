@@ -210,6 +210,22 @@ func TestIPSet(t *testing.T) {
 			},
 			wantPrefixes: pxv("10.0.0.0/30", "10.0.0.255/32"),
 		},
+		{
+			// regression test for a bug where Ranges returned invalid IPRanges.
+			name: "single_ip_removal",
+			f: func(s *IPSet) {
+				s.Add(mustIP("10.0.0.0"))
+				s.Add(mustIP("10.0.0.1"))
+				s.Add(mustIP("10.0.0.2"))
+				s.Add(mustIP("10.0.0.3"))
+				s.Add(mustIP("10.0.0.4"))
+				s.Remove(mustIP("10.0.0.4"))
+			},
+			wantRanges: []IPRange{
+				{mustIP("10.0.0.0"), mustIP("10.0.0.3")},
+			},
+			wantPrefixes: pxv("10.0.0.0/30"),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -220,6 +236,7 @@ func TestIPSet(t *testing.T) {
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
 				for _, v := range got {
+					debugf("%s -> %s", v.From, v.To)
 					if !v.Valid() {
 						t.Errorf("invalid IPRange in result: %s -> %s", v.From, v.To)
 					}
