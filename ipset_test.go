@@ -301,19 +301,22 @@ func TestIPSetRemoveFreePrefix(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
-		var s IPSet
-		tt.f(&s)
-		got, ok := s.RemoveFreePrefix(tt.b)
-		if ok != tt.wantOK {
-			t.Errorf("extractPrefix() ok = %t, wantOK %t", ok, tt.wantOK)
-			return
-		}
-		if !reflect.DeepEqual(got, tt.wantPrefix) {
-			t.Errorf("extractPrefix() = %v, want %v", got, tt.wantPrefix)
-		}
-		if !reflect.DeepEqual(s.Prefixes(), tt.wantPrefixes) {
-			t.Errorf("extractPrefix() = %v, want %v", s.Prefixes(), tt.wantPrefixes)
-		}
+		t.Run(tt.name, func(t *testing.T) {
+			debugf = t.Logf
+			var s IPSet
+			tt.f(&s)
+			got, ok := s.RemoveFreePrefix(tt.b)
+			if ok != tt.wantOK {
+				t.Errorf("extractPrefix() ok = %t, wantOK %t", ok, tt.wantOK)
+				return
+			}
+			if !reflect.DeepEqual(got, tt.wantPrefix) {
+				t.Errorf("extractPrefix() = %v, want %v", got, tt.wantPrefix)
+			}
+			if !reflect.DeepEqual(s.Prefixes(), tt.wantPrefixes) {
+				t.Errorf("extractPrefix() = %v, want %v", s.Prefixes(), tt.wantPrefixes)
+			}
+		})
 	}
 }
 
