@@ -701,3 +701,35 @@ func TestIPSetRangesStress(t *testing.T) {
 		}
 	}
 }
+
+func TestIPSetEqual(t *testing.T) {
+	a := new(IPSet)
+	b := new(IPSet)
+
+	assertEqual := func(want bool) {
+		t.Helper()
+		if got := a.Equal(b); got != want {
+			t.Errorf("%v.Equal(%v) = %v want %v", a, b, got, want)
+		}
+	}
+
+	a.Add(MustParseIP("1.1.1.0"))
+	a.Add(MustParseIP("1.1.1.1"))
+	a.Add(MustParseIP("1.1.1.2"))
+	b.AddPrefix(MustParseIPPrefix("1.1.1.0/31"))
+	b.Add(MustParseIP("1.1.1.2"))
+	assertEqual(true)
+
+	a.RemoveSet(a)
+	assertEqual(false)
+	b.RemoveSet(b)
+	assertEqual(true)
+
+	a.Add(MustParseIP("1.1.1.0"))
+	a.Add(MustParseIP("1.1.1.1"))
+	a.Add(MustParseIP("1.1.1.2"))
+
+	b.AddPrefix(MustParseIPPrefix("1.1.1.0/30"))
+	b.Remove(MustParseIP("1.1.1.3"))
+	assertEqual(true)
+}
