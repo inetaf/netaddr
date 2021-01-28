@@ -309,3 +309,18 @@ func (s *IPSet) ContainsFunc() (contains func(IP) bool) {
 		return rv[i].contains(ip)
 	}
 }
+
+// Equal reports whether s contains exactly the same IPs as t.
+func (s *IPSet) Equal(t *IPSet) bool {
+	sr := s.Ranges()
+	tr := t.Ranges()
+	if len(sr) != len(tr) {
+		return false
+	}
+	for i := range sr {
+		if sr[i] != tr[i] {
+			return false
+		}
+	}
+	return true
+}
