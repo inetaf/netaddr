@@ -129,6 +129,23 @@ func (s *IPSet) Intersect(b *IPSet) {
 	s.RemoveSet(b)
 }
 
+// Overlaps returns whether s and b have any IPs in common.
+func (s *IPSet) Overlaps(b *IPSet) bool {
+	sr, br := s.Ranges(), b.Ranges()
+	for len(sr) > 0 && len(br) > 0 {
+		sr0, br0 := sr[0], br[0]
+		switch {
+		case sr0.Overlaps(br0):
+			return true
+		case sr0.entirelyBefore(br0):
+			sr = sr[1:]
+		default:
+			br = br[1:]
+		}
+	}
+	return false
+}
+
 func discardf(format string, args ...interface{}) {}
 
 // debugf is reassigned by tests.
