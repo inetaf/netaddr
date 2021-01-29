@@ -481,11 +481,11 @@ func TestIPSetOverlaps(t *testing.T) {
 	for _, test := range tests {
 		got := test.a.Overlaps(test.b)
 		if got != test.want {
-			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.a, test.b, got, test.want)
+			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.a.Ranges(), test.b.Ranges(), got, test.want)
 		}
 		got = test.b.Overlaps(test.a)
 		if got != test.want {
-			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.b, test.a, got, test.want)
+			t.Errorf("(%s).Overlaps(%s) = %v, want %v", test.b.Ranges(), test.a.Ranges(), got, test.want)
 		}
 	}
 }

@@ -1295,7 +1295,7 @@ func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
 	// the caller.
 	switch len(rr) {
 	case 0:
-		return nil, true
+		return []IPRange{}, true
 	case 1:
 		return []IPRange{rr[0]}, true
 	}

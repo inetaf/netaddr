@@ -4,7 +4,10 @@
 
 package netaddr
 
-import "sort"
+import (
+	"sort"
+	"sync"
+)
 
 // IPSet represents a set of IP addresses.
 //
@@ -15,19 +18,13 @@ import "sort"
 // nothing on an empty set. Ranges may be fully, partially, or not
 // overlapping.
 type IPSet struct {
+	mu sync.Mutex // protects all fields
+
 	// in are the ranges in the set.
 	in []IPRange
 
 	// out are the ranges to be removed from 'in'.
 	out []IPRange
-}
-
-// toInOnly updates s to clear s.out, by merging any s.out into s.in.
-func (s *IPSet) toInOnly() {
-	if len(s.out) > 0 {
-		s.in = s.Ranges()
-		s.out = nil
-	}
 }
 
 // Clone returns a copy of s that shares no memory with s.
@@ -45,12 +42,20 @@ func (s *IPSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
 
 // AddRange adds r to s.
 func (s *IPSet) AddRange(r IPRange) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.addRangeLocked(r)
+}
+
+func (s *IPSet) addRangeLocked(r IPRange) {
 	if !r.Valid() {
 		return
 	}
 	// If there are any removals (s.out), then we need to compact the set
 	// first to get the order right.
-	s.toInOnly()
+	if len(s.out) > 0 {
+		s.rangesLocked()
+	}
 	s.in = append(s.in, r)
 }
 
@@ -59,7 +64,9 @@ func (s *IPSet) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
 
 // RemoveFreePrefix removes and returns a Prefix of length bits from the IPSet.
 func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, ok bool) {
-	prefixes := s.Prefixes()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	prefixes := s.prefixesLocked()
 	if len(prefixes) == 0 {
 		return IPPrefix{}, false
 	}
@@ -83,7 +90,7 @@ func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, ok bool) {
 	}
 
 	prefix := IPPrefix{IP: bestFit.IP, Bits: bitLen}
-	s.RemovePrefix(prefix)
+	s.removeRangeLocked(prefix.Range())
 	return prefix, true
 }
 
@@ -92,6 +99,12 @@ func (s *IPSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
 
 // RemoveRange removes r from s.
 func (s *IPSet) RemoveRange(r IPRange) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.removeRangeLocked(r)
+}
+
+func (s *IPSet) removeRangeLocked(r IPRange) {
 	if r.Valid() {
 		s.out = append(s.out, r)
 	}
@@ -99,23 +112,30 @@ func (s *IPSet) RemoveRange(r IPRange) {
 
 // AddSet adds all ranges in b to s.
 func (s *IPSet) AddSet(b *IPSet) {
-	for _, r := range b.Ranges() {
-		s.AddRange(r)
+	rr := b.Ranges()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, r := range rr {
+		s.addRangeLocked(r)
 	}
 }
 
 // RemoveSet removes all ranges in b from s.
 func (s *IPSet) RemoveSet(b *IPSet) {
-	for _, r := range b.Ranges() {
-		s.RemoveRange(r)
+	rr := b.Ranges()
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, r := range rr {
+		s.removeRangeLocked(r)
 	}
 }
 
 // Complement updates s to contain the complement of its current
 // contents.
 func (s *IPSet) Complement() {
-	s.toInOnly()
-	s.out = s.in
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.out = s.rangesLocked()
 	s.in = []IPRange{
 		IPPrefix{IP: IPv4(0, 0, 0, 0), Bits: 0}.Range(),
 		IPPrefix{IP: IPv6Unspecified(), Bits: 0}.Range(),
@@ -154,6 +174,12 @@ var debugf = discardf
 // Ranges returns the minimum and sorted set of IP
 // ranges that covers s.
 func (s *IPSet) Ranges() []IPRange {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.rangesLocked()
+}
+
+func (s *IPSet) rangesLocked() []IPRange {
 	const debug = false
 	if debug {
 		debugf("ranges start in=%v out=%v", s.in, s.out)
@@ -168,6 +194,14 @@ func (s *IPSet) Ranges() []IPRange {
 	}
 	if debug {
 		debugf("ranges sort  in=%v out=%v", in, out)
+	}
+
+	if len(out) == 0 {
+		// Fast path that avoids allocating further, if no removals
+		// are needed.
+		s.in = in
+		s.out = nil
+		return s.in
 	}
 
 	// in and out are sorted in ascending range order, and have no
@@ -274,7 +308,8 @@ func (s *IPSet) Ranges() []IPRange {
 		}
 	}
 
-	// TODO: possibly update s.in and s.out, if #110 supports that.
+	s.in = ret
+	s.out = nil
 
 	return ret
 }
@@ -284,8 +319,14 @@ func (s *IPSet) Ranges() []IPRange {
 // returning a new slice of prefixes that covers all of the given 'add'
 // prefixes with all the 'remove' prefixes removed.
 func (s *IPSet) Prefixes() []IPPrefix {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.prefixesLocked()
+}
+
+func (s *IPSet) prefixesLocked() []IPPrefix {
 	var out []IPPrefix
-	for _, r := range s.Ranges() {
+	for _, r := range s.rangesLocked() {
 		out = append(out, r.Prefixes()...)
 	}
 	return out
