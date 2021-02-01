@@ -1,9 +1,5 @@
 # netaddr
 
-## Warning
-
-This package is a work in progress. Don't use it yet.
-
 ## What
 
 This is a package containing a new IP address type for Go.
@@ -18,6 +14,11 @@ See its docs: https://godoc.org/inet.af/netaddr
 * merges net.IPAddr and net.IP (which the Go net package is a little torn between for legacy reasons)
 * ...
 * TODO: finish this list
+
+## Maturity
+
+This package is mature, optimized, and used heavily in production at [Tailscale](https://tailscale.com).
+However, API stability is not yet guaranteed.
 
 ## Testing
 
