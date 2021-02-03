@@ -1138,7 +1138,7 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 	return err
 }
 
-// Strings returns the CIDR notation of p: "<ip>/<bits>".
+// String returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
 	if !p.Valid() {
 		return "invalid IP prefix"
