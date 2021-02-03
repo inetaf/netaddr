@@ -43,8 +43,10 @@ func TestInlining(t *testing.T) {
 	})
 	for _, want := range []string{
 		"(*IPSet).Add",
+		"(*IPSet).Clone",
 		"(*IPSet).Remove",
 		"(*IPSet).RemoveRange",
+		"(*IPSet).toInOnly",
 		"(*uint128).halves",
 		"IP.BitLen",
 		"IP.IPAddr",
@@ -60,6 +62,7 @@ func TestInlining(t *testing.T) {
 		"IP.Prior",
 		"IP.Unmap",
 		"IP.Zone",
+		"IP.lessOrEq",
 		"IP.v4",
 		"IP.v6",
 		"IP.v6u16",
@@ -74,6 +77,7 @@ func TestInlining(t *testing.T) {
 		"IPPrefix.Masked",
 		"IPPrefix.Valid",
 		"IPRange.Prefixes",
+		"IPRange.entirelyBefore",
 		"IPRange.prefixFrom128AndBits",
 		"IPRange.prefixFrom128AndBits-fm",
 		"IPv4",
