@@ -756,6 +756,11 @@ func appendHex(b []byte, x uint16) []byte {
 	return append(b, digits[x&0xf])
 }
 
+// appendHexPad appends the fully padded hex string representation of x to b.
+func appendHexPad(b []byte, x uint16) []byte {
+	return append(b, digits[x>>12], digits[x>>8&0xf], digits[x>>4&0xf], digits[x&0xf])
+}
+
 func (ip IP) string4() string {
 	const max = len("255.255.255.255")
 	ret := make([]byte, 0, max)
@@ -824,6 +829,34 @@ func (ip IP) appendTo6(ret []byte) []byte {
 		ret = append(ret, ip.Zone()...)
 	}
 	return ret
+}
+
+// StringExpanded is like String but IPv6 addresses are expanded with leading
+// zeroes and no "::" compression. For example, "2001:db8::1" becomes
+// "2001:0db8:0000:0000:0000:0000:0000:0001".
+func (ip IP) StringExpanded() string {
+	switch ip.z {
+	case z0, z4:
+		return ip.String()
+	}
+
+	const size = len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
+	ret := make([]byte, 0, size)
+	for i := uint8(0); i < 8; i++ {
+		if i > 0 {
+			ret = append(ret, ':')
+		}
+
+		ret = appendHexPad(ret, ip.v6u16(i))
+	}
+
+	if ip.z != z6noz {
+		// The addition of a zone will cause a second allocation, but when there
+		// is no zone the ret slice will be stack allocated.
+		ret = append(ret, '%')
+		ret = append(ret, ip.Zone()...)
+	}
+	return string(ret)
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,
