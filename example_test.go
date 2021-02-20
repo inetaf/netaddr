@@ -11,16 +11,17 @@ import (
 )
 
 func ExampleIPSet() {
-	var s netaddr.IPSet
+	var b netaddr.IPSetBuilder
 
-	p, _ := netaddr.ParseIPPrefix("10.0.0.0/8")
-	s.AddPrefix(p)
-	p, _ = netaddr.ParseIPPrefix("10.0.0.0/16")
-	s.RemovePrefix(p)
+	b.AddPrefix(netaddr.MustParseIPPrefix("10.0.0.0/8"))
+	b.RemovePrefix(netaddr.MustParseIPPrefix("10.0.0.0/16"))
 
-	ip1, _ := netaddr.ParseIP("fed0::0400")
-	ip2, _ := netaddr.ParseIP("fed0::04ff")
-	s.AddRange(netaddr.IPRange{From: ip1, To: ip2})
+	b.AddRange(netaddr.IPRange{
+		From: netaddr.MustParseIP("fed0::0400"),
+		To:   netaddr.MustParseIP("fed0::04ff"),
+	})
+
+	s := b.IPSet()
 
 	fmt.Println("Ranges:")
 	for _, r := range s.Ranges() {
