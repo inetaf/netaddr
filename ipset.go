@@ -6,15 +6,15 @@ package netaddr
 
 import "sort"
 
-// IPSet represents a set of IP addresses.
+// IPSetBuilder builds an immutable IPSet.
 //
 // The zero value is a valid value representing a set of no IPs.
 //
 // The Add and Remove methods add or remove IPs to/from the set.
-// Add methods should be called first, as a remove operation does
-// nothing on an empty set. Ranges may be fully, partially, or not
-// overlapping.
-type IPSet struct {
+// Removals only affect the current membership of the set, so in
+// general Adds should be called first. Input ranges may overlap in
+// any way.
+type IPSetBuilder struct {
 	// in are the ranges in the set.
 	in []IPRange
 
@@ -22,149 +22,20 @@ type IPSet struct {
 	out []IPRange
 }
 
-// toInOnly updates s to clear s.out, by merging any s.out into s.in.
-func (s *IPSet) toInOnly() {
-	if len(s.out) > 0 {
-		s.in = s.Ranges()
-		s.out = nil
-	}
-}
-
-// Clone returns a copy of s that shares no memory with s.
-func (s *IPSet) Clone() *IPSet {
-	return &IPSet{
-		in: s.Ranges(),
-	}
-}
-
-// Add adds ip to the set s.
-func (s *IPSet) Add(ip IP) { s.AddRange(IPRange{ip, ip}) }
-
-// AddPrefix adds p's range to s.
-func (s *IPSet) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
-
-// AddRange adds r to s.
-func (s *IPSet) AddRange(r IPRange) {
-	if !r.Valid() {
-		return
-	}
-	// If there are any removals (s.out), then we need to compact the set
-	// first to get the order right.
-	s.toInOnly()
-	s.in = append(s.in, r)
-}
-
-// Remove removes ip from the set s.
-func (s *IPSet) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
-
-// RemoveFreePrefix removes and returns a Prefix of length bits from the IPSet.
-func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, ok bool) {
-	prefixes := s.Prefixes()
-	if len(prefixes) == 0 {
-		return IPPrefix{}, false
-	}
-
-	var bestFit IPPrefix
-	for _, prefix := range prefixes {
-		if prefix.Bits > bitLen {
-			continue
-		}
-		if bestFit.IP.IsZero() || prefix.Bits > bestFit.Bits {
-			bestFit = prefix
-			if bestFit.Bits == bitLen {
-				// exact match, done.
-				break
-			}
-		}
-	}
-
-	if bestFit.IP.IsZero() {
-		return IPPrefix{}, false
-	}
-
-	prefix := IPPrefix{IP: bestFit.IP, Bits: bitLen}
-	s.RemovePrefix(prefix)
-	return prefix, true
-}
-
-// RemovePrefix removes p's range from s.
-func (s *IPSet) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
-
-// RemoveRange removes r from s.
-func (s *IPSet) RemoveRange(r IPRange) {
-	if r.Valid() {
-		s.out = append(s.out, r)
-	}
-}
-
-// AddSet adds all ranges in b to s.
-func (s *IPSet) AddSet(b *IPSet) {
-	for _, r := range b.Ranges() {
-		s.AddRange(r)
-	}
-}
-
-// RemoveSet removes all ranges in b from s.
-func (s *IPSet) RemoveSet(b *IPSet) {
-	for _, r := range b.Ranges() {
-		s.RemoveRange(r)
-	}
-}
-
-// Complement updates s to contain the complement of its current
-// contents.
-func (s *IPSet) Complement() {
-	s.toInOnly()
-	s.out = s.in
-	s.in = []IPRange{
-		IPPrefix{IP: IPv4(0, 0, 0, 0), Bits: 0}.Range(),
-		IPPrefix{IP: IPv6Unspecified(), Bits: 0}.Range(),
-	}
-}
-
-// Intersect updates s to the set intersection of s and b.
-func (s *IPSet) Intersect(b *IPSet) {
-	b = b.Clone()
-	b.Complement()
-	s.RemoveSet(b)
-}
-
-// Overlaps returns whether s and b have any IPs in common.
-func (s *IPSet) Overlaps(b *IPSet) bool {
-	sr, br := s.Ranges(), b.Ranges()
-	for len(sr) > 0 && len(br) > 0 {
-		sr0, br0 := sr[0], br[0]
-		switch {
-		case sr0.Overlaps(br0):
-			return true
-		case sr0.entirelyBefore(br0):
-			sr = sr[1:]
-		default:
-			br = br[1:]
-		}
-	}
-	return false
-}
-
-func discardf(format string, args ...interface{}) {}
-
-// debugf is reassigned by tests.
-var debugf = discardf
-
-// Ranges returns the minimum and sorted set of IP
-// ranges that covers s.
-func (s *IPSet) Ranges() []IPRange {
+// normalize normalizes s: s.in becomes the minimal sorted list of
+// ranges required to describe s, and s.out becomes empty.
+func (s *IPSetBuilder) normalize() {
 	const debug = false
 	if debug {
 		debugf("ranges start in=%v out=%v", s.in, s.out)
 	}
 	in, ok := mergeIPRanges(s.in)
 	if !ok {
-		return nil
+		return
 	}
 	out, ok := mergeIPRanges(s.out)
 	if !ok {
-		return nil
+		return
 	}
 	if debug {
 		debugf("ranges sort  in=%v out=%v", in, out)
@@ -174,7 +45,7 @@ func (s *IPSet) Ranges() []IPRange {
 	// overlaps within each other. We can run a merge of the two lists
 	// in one pass.
 
-	ret := make([]IPRange, 0, len(in))
+	min := make([]IPRange, 0, len(in))
 	for len(in) > 0 && len(out) > 0 {
 		rin, rout := in[0], out[0]
 		if debug {
@@ -200,11 +71,11 @@ func (s *IPSet) Ranges() []IPRange {
 			//
 			//    in         out
 			// f------t   f-------t
-			ret = append(ret, rin)
+			min = append(min, rin)
 			in = in[1:]
 			if debug {
 				debugf("in before out; append in")
-				debugf("ret=%v", ret)
+				debugf("min=%v", min)
 			}
 		case rin.coveredBy(rout):
 			// "out" entirely covers "in".
@@ -224,14 +95,14 @@ func (s *IPSet) Ranges() []IPRange {
 			// f-------------t
 			//    f------t
 			//       out
-			ret = append(ret, IPRange{From: rin.From, To: rout.From.Prior()})
+			min = append(min, IPRange{From: rin.From, To: rout.From.Prior()})
 			// Adjust in[0], not ir, because we want to consider the
 			// mutated range on the next iteration.
 			in[0].From = rout.To.Next()
 			out = out[1:]
 			if debug {
 				debugf("out inside in; split in, append first in, drop out, adjust second in")
-				debugf("ret=%v", ret)
+				debugf("min=%v", min)
 			}
 		case rout.overlapsStartOf(rin):
 			// "out" overlaps start of "in".
@@ -241,7 +112,7 @@ func (s *IPSet) Ranges() []IPRange {
 			//    f------t
 			//       in
 			in[0].From = rout.To.Next()
-			// Can't move ir onto ret yet, another later out might
+			// Can't move ir onto min yet, another later out might
 			// trim it further. Just discard or and continue.
 			out = out[1:]
 			if debug {
@@ -254,11 +125,11 @@ func (s *IPSet) Ranges() []IPRange {
 			//        f------t
 			//    f------t
 			//       in
-			ret = append(ret, IPRange{From: rin.From, To: rout.From.Prior()})
+			min = append(min, IPRange{From: rin.From, To: rout.From.Prior()})
 			in = in[1:]
 			if debug {
 				debugf("merge out cuts end of in; append shortened in")
-				debugf("ret=%v", ret)
+				debugf("min=%v", min)
 			}
 		default:
 			// The above should account for all combinations of in and
@@ -268,59 +139,244 @@ func (s *IPSet) Ranges() []IPRange {
 	}
 	if len(in) > 0 {
 		// Ran out of removals before the end of in.
-		ret = append(ret, in...)
+		min = append(min, in...)
 		if debug {
-			debugf("ret=%v", ret)
+			debugf("min=%v", min)
 		}
 	}
 
-	// TODO: possibly update s.in and s.out, if #110 supports that.
+	s.in = min
+	s.out = nil
+}
 
-	return ret
+// Clone returns a copy of s that shares no memory with s.
+func (s *IPSetBuilder) Clone() *IPSetBuilder {
+	return &IPSetBuilder{
+		in:  append([]IPRange(nil), s.in...),
+		out: append([]IPRange(nil), s.out...),
+	}
+}
+
+// Add adds ip to s.
+func (s *IPSetBuilder) Add(ip IP) { s.AddRange(IPRange{ip, ip}) }
+
+// AddPrefix adds all IPs in p to s.
+func (s *IPSetBuilder) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
+
+// AddRange adds r to s.
+// If r is not Valid, AddRange does nothing.
+func (s *IPSetBuilder) AddRange(r IPRange) {
+	if !r.Valid() {
+		return
+	}
+	// If there are any removals (s.out), then we need to compact the set
+	// first to get the order right.
+	if len(s.out) > 0 {
+		s.normalize()
+	}
+	s.in = append(s.in, r)
+}
+
+// AddSet adds all IPs in b to s.
+func (s *IPSetBuilder) AddSet(b *IPSet) {
+	for _, r := range b.rr {
+		s.AddRange(r)
+	}
+}
+
+// Remove removes ip from s.
+func (s *IPSetBuilder) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
+
+// RemovePrefix removes all IPs in p from s.
+func (s *IPSetBuilder) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
+
+// RemoveRange removes all IPs in r from s.
+func (s *IPSetBuilder) RemoveRange(r IPRange) {
+	if r.Valid() {
+		s.out = append(s.out, r)
+	}
+}
+
+// RemoveSet removes all IPs in o from s.
+func (s *IPSetBuilder) RemoveSet(b *IPSet) {
+	for _, r := range b.rr {
+		s.RemoveRange(r)
+	}
+}
+
+// removeBuilder removes all IPs in b from s.
+func (s *IPSetBuilder) removeBuilder(b *IPSetBuilder) {
+	b.normalize()
+	for _, r := range b.in {
+		s.RemoveRange(r)
+	}
+}
+
+// Complement updates s to contain the complement of its current
+// contents.
+func (s *IPSetBuilder) Complement() {
+	s.normalize()
+	s.out = s.in
+	s.in = []IPRange{
+		IPPrefix{IP: IPv4(0, 0, 0, 0), Bits: 0}.Range(),
+		IPPrefix{IP: IPv6Unspecified(), Bits: 0}.Range(),
+	}
+}
+
+// Intersect updates s to the set intersection of s and b.
+func (s *IPSetBuilder) Intersect(b *IPSet) {
+	var o IPSetBuilder
+	o.Complement()
+	o.RemoveSet(b)
+	s.removeBuilder(&o)
+}
+
+func discardf(format string, args ...interface{}) {}
+
+// debugf is reassigned by tests.
+var debugf = discardf
+
+// IPSet returns an immutable IPSet representing the current state of
+// s. The builder remains usable after calling IPSet.
+func (s *IPSetBuilder) IPSet() *IPSet {
+	s.normalize()
+	return &IPSet{
+		rr: append([]IPRange{}, s.in...),
+	}
+}
+
+// IPSet represents a set of IP addresses.
+//
+// IPSet is safe for concurrent use.
+// The zero value is a valid value representing a set of no IPs.
+// Use IPSetBuilder to construct IPSets.
+type IPSet struct {
+	// rr is the set of IPs that belong to this IPSet. The IPRanges
+	// are normalized according to IPSetBuilder.normalize, meaning
+	// they are a sorted, minimal representation (no overlapping
+	// ranges, no contiguous ranges). The implementation of various
+	// methods rely on this property.
+	rr []IPRange
+}
+
+// Ranges returns the minimum and sorted set of IP
+// ranges that covers s.
+func (s *IPSet) Ranges() []IPRange {
+	return append([]IPRange{}, s.rr...)
 }
 
 // Prefixes returns the minimum and sorted set of IP prefixes
 // that covers s.
-// returning a new slice of prefixes that covers all of the given 'add'
-// prefixes with all the 'remove' prefixes removed.
 func (s *IPSet) Prefixes() []IPPrefix {
-	var out []IPPrefix
-	for _, r := range s.Ranges() {
+	out := make([]IPPrefix, 0, len(s.rr))
+	for _, r := range s.rr {
 		out = append(out, r.Prefixes()...)
 	}
 	return out
 }
 
-// ContainsFunc returns a func that reports whether an IP is in s.
-// The returned func operates on a copy of s, so s may be mutated
-// later.
-func (s *IPSet) ContainsFunc() (contains func(IP) bool) {
-	rv := s.Ranges()
-	// TODO(bradfitz): build a faster data structure with
-	// with s.Prefixes()?
-	return func(ip IP) bool {
-		i := sort.Search(len(rv), func(i int) bool {
-			return ip.Less(rv[i].From)
-		})
-		if i == 0 {
-			return false
-		}
-		i--
-		return rv[i].contains(ip)
-	}
-}
-
-// Equal reports whether s contains exactly the same IPs as t.
-func (s *IPSet) Equal(t *IPSet) bool {
-	sr := s.Ranges()
-	tr := t.Ranges()
-	if len(sr) != len(tr) {
+// Equal reports whether s and o represent the same set of IP
+// addresses.
+func (s *IPSet) Equal(o *IPSet) bool {
+	if len(s.rr) != len(o.rr) {
 		return false
 	}
-	for i := range sr {
-		if sr[i] != tr[i] {
+	for i := range s.rr {
+		if s.rr[i] != o.rr[i] {
 			return false
 		}
 	}
 	return true
+}
+
+// Contains reports whether ip is in s.
+func (s *IPSet) Contains(ip IP) bool {
+	// TODO: data structure permitting more efficient lookups:
+	// https://github.com/inetaf/netaddr/issues/139
+	i := sort.Search(len(s.rr), func(i int) bool {
+		return ip.Less(s.rr[i].From)
+	})
+	if i == 0 {
+		return false
+	}
+	i--
+	return s.rr[i].contains(ip)
+}
+
+// ContainsRange reports whether all IPs in r are in s.
+func (s *IPSet) ContainsRange(r IPRange) bool {
+	for _, x := range s.rr {
+		if r.coveredBy(x) {
+			return true
+		}
+	}
+	return false
+}
+
+// ContainsPrefix reports whether all IPs in p are in s.
+func (s *IPSet) ContainsPrefix(p IPPrefix) bool {
+	return s.ContainsRange(p.Range())
+}
+
+// Overlaps reports whether any IP in b is also in s.
+func (s *IPSet) Overlaps(b *IPSet) bool {
+	// TODO: sorted ranges lets us do this in O(n+m)
+	for _, r := range s.rr {
+		for _, or := range b.rr {
+			if r.Overlaps(or) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// OverlapsRange reports whether any IP in r is also in s.
+func (s *IPSet) OverlapsRange(r IPRange) bool {
+	// TODO: sorted ranges lets us do this more efficiently.
+	for _, x := range s.rr {
+		if x.Overlaps(r) {
+			return true
+		}
+	}
+	return false
+}
+
+// OverlapsPrefix reports whether any IP in p is also in s.
+func (s *IPSet) OverlapsPrefix(p IPPrefix) bool {
+	return s.OverlapsRange(p.Range())
+}
+
+// RemoveFreePrefix splits s into a Prefix of length bitLen and a new
+// IPSet with that prefix removed.
+//
+// If no contiguous prefix of length bitLen exists in s,
+// RemoveFreePrefix returns ok=false.
+func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, newSet *IPSet, ok bool) {
+	var bestFit IPPrefix
+	for _, r := range s.rr {
+		for _, prefix := range r.Prefixes() {
+			if prefix.Bits > bitLen {
+				continue
+			}
+			if bestFit.IP.IsZero() || prefix.Bits > bestFit.Bits {
+				bestFit = prefix
+				if bestFit.Bits == bitLen {
+					// exact match, done.
+					break
+				}
+			}
+		}
+	}
+
+	if bestFit.IP.IsZero() {
+		return IPPrefix{}, s, false
+	}
+
+	prefix := IPPrefix{IP: bestFit.IP, Bits: bitLen}
+
+	var b IPSetBuilder
+	b.AddSet(s)
+	b.RemovePrefix(prefix)
+	return prefix, b.IPSet(), true
 }
