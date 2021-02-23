@@ -829,6 +829,174 @@ func TestIPPrefixMasking(t *testing.T) {
 	}
 }
 
+func TestIPNetmasking(t *testing.T) {
+	type subtest struct {
+		ip   IP
+		mask []byte
+		p    IPPrefix
+		ok   bool
+	}
+
+	// makeIPv6 produces a set of IPv6 subtests with an optional zone identifier.
+	makeIPv6 := func(zone string) []subtest {
+		if zone != "" {
+			zone = "%" + zone
+		}
+
+		return []subtest{
+			{
+				ip: mustIP(fmt.Sprintf("2001:db8::1%s", zone)),
+				mask: []byte{
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+				},
+			},
+			{
+				ip: mustIP(fmt.Sprintf("2001:db8::1%s", zone)),
+				mask: []byte{
+					0, 0, 0, 0, 0, 0, 0, 0,
+					0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0,
+				},
+			},
+			{
+				ip: mustIP(fmt.Sprintf("2001:db8::1%s", zone)),
+				mask: []byte{
+					0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, 0, 0,
+				},
+				p:  mustIPPrefix(fmt.Sprintf("2001:db8::%s/32", zone)),
+				ok: true,
+			},
+			{
+				ip: mustIP(fmt.Sprintf("fe80::dead:beef:dead:beef%s", zone)),
+				mask: []byte{
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+					0xFF, 0xFF, 0xFF, 0xFF, 0, 0, 0, 0,
+				},
+				p:  mustIPPrefix(fmt.Sprintf("fe80::dead:beef:0:0%s/96", zone)),
+				ok: true,
+			},
+			{
+				ip: mustIP(fmt.Sprintf("aaaa::%s", zone)),
+				mask: []byte{
+					0xF0, 0, 0, 0, 0, 0, 0, 0,
+					0, 0, 0, 0, 0, 0, 0, 0,
+				},
+				p:  mustIPPrefix(fmt.Sprintf("a000::%s/4", zone)),
+				ok: true,
+			},
+			{
+				ip: mustIP(fmt.Sprintf("::%s", zone)),
+				mask: []byte{
+					0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFE,
+					0, 0, 0, 0, 0, 0, 0, 0,
+				},
+				p:  mustIPPrefix(fmt.Sprintf("::%s/63", zone)),
+				ok: true,
+			},
+		}
+	}
+
+	tests := []struct {
+		family   string
+		subtests []subtest
+	}{
+		{
+			family: "nil",
+			subtests: []subtest{
+				{
+					ok: true,
+				},
+			},
+		},
+		{
+			family: "IPv4",
+			subtests: []subtest{
+				{
+					ip: mustIP("192.0.2.0"),
+					mask: []byte{
+						0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+						0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+						0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+						0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,
+					},
+				},
+				{
+					ip:   mustIP("192.0.2.0"),
+					mask: []byte{0xFF, 0, 0xFF, 0},
+				},
+				{
+					ip:   mustIP("192.0.2.0"),
+					mask: []byte{0xFF, 0xFF, 0, 0},
+					p:    mustIPPrefix("192.0.0.0/16"),
+					ok:   true,
+				},
+				{
+					ip:   mustIP("255.255.255.255"),
+					mask: []byte{0xFF, 0xFF, 0xF0, 0},
+					p:    mustIPPrefix("255.255.240.0/20"),
+					ok:   true,
+				},
+				{
+					// Partially masking one byte that contains both
+					// 1s and 0s on either side of the mask limit.
+					ip:   mustIP("100.98.156.66"),
+					mask: []byte{0xFF, 0xC0, 0, 0},
+					p:    mustIPPrefix("100.64.0.0/10"),
+					ok:   true,
+				},
+			},
+		},
+		{
+			family:   "IPv6",
+			subtests: makeIPv6(""),
+		},
+		{
+			family:   "IPv6 zone",
+			subtests: makeIPv6("eth0"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.family, func(t *testing.T) {
+			for _, st := range tt.subtests {
+				t.Run(st.p.String(), func(t *testing.T) {
+					origIP := st.ip.String()
+					origMask := make([]byte, len(st.mask))
+					copy(origMask, st.mask)
+
+					p, err := st.ip.Netmask(st.mask)
+					if st.ok && err != nil {
+						t.Fatalf("failed to produce prefix: %v", err)
+					}
+					if !st.ok && err == nil {
+						t.Fatal("expected an error, but none occurred")
+					}
+
+					if err != nil {
+						t.Logf("err: %v", err)
+						return
+					}
+
+					if !reflect.DeepEqual(p, st.p) {
+						t.Errorf("prefix = %q, want %q", p, st.p)
+					}
+
+					if st.mask != nil && !reflect.DeepEqual(origMask, st.mask) {
+						t.Errorf("Netmask was mutated: %q, want %q", origMask, st.mask)
+					}
+
+					if got := st.ip.String(); got != origIP {
+						t.Errorf("IP was mutated: %q, want %q", got, origIP)
+					}
+				})
+			}
+		})
+	}
+}
+
 func TestIPPrefixMarshalUnmarshal(t *testing.T) {
 	tests := []string{
 		"",

@@ -587,6 +587,34 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 	return IPPrefix{ip, bits}, nil
 }
 
+// Netmask applies a bit mask to IP, producing an IPPrefix. If IP is the
+// zero value, a zero-value IPPrefix and a nil error are returned. If the
+// netmask length is not 4 for IPv4 or 16 for IPv6, an error is
+// returned. If the netmask is non-contiguous, an error is returned.
+func (ip *IP) Netmask(mask []byte) (IPPrefix, error) {
+	l := len(mask)
+
+	switch ip.z {
+	case z0:
+		return IPPrefix{}, nil
+	case z4:
+		if l != net.IPv4len {
+			return IPPrefix{}, fmt.Errorf("netmask length %d incorrect for IPv4", l)
+		}
+	default:
+		if l != net.IPv6len {
+			return IPPrefix{}, fmt.Errorf("netmask length %d incorrect for IPv6", l)
+		}
+	}
+
+	ones, bits := net.IPMask(mask).Size()
+	if ones == 0 && bits == 0 {
+		return IPPrefix{}, errors.New("netmask is non-contiguous")
+	}
+
+	return ip.Prefix(uint8(ones))
+}
+
 // As16 returns the IP address in its 16 byte representation.
 // IPv4 addresses are returned in their v6-mapped form.
 // IPv6 addresses with zones are returned without their zone (use the
