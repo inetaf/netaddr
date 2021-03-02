@@ -137,7 +137,7 @@ func ParseIP(s string) (IP, error) {
 			return IP{}, parseIPError{in: s, msg: "missing IPv6 address"}
 		}
 	}
-	return IP{}, errors.New("unable to parse IP")
+	return IP{}, parseIPError{in: s, msg: "unable to parse IP"}
 }
 
 // MustParseIP calls ParseIP(s) and panics on error.

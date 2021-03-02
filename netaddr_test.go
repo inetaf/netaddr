@@ -1284,6 +1284,9 @@ func TestParseIPError(t *testing.T) {
 			if err == nil {
 				t.Fatal("no error")
 			}
+			if _, ok := err.(parseIPError); !ok {
+				t.Errorf("error type is %T, want parseIPError", err)
+			}
 			if test.errstr == "" {
 				test.errstr = "unable to parse IP"
 			}
