@@ -8,6 +8,11 @@ See its docs: https://godoc.org/inet.af/netaddr
 
 ## Motivation
 
+See https://tailscale.com/blog/netaddr-new-ip-type-for-go/ for a long
+blog post about why we made a new IP address package.
+
+Other links:
+
 * https://github.com/golang/go/issues/18804 ("net: reconsider representation of IP")
 * https://github.com/golang/go/issues/18757 ("net: ParseIP should return an error, like other Parse functions")
 * https://github.com/golang/go/issues/37921 ("net: Unable to reliably distinguish IPv4-mapped-IPv6 addresses from regular IPv4 addresses")
