@@ -908,7 +908,7 @@ func (p IPPort) UDPAddrAt(at *net.UDPAddr) *net.UDPAddr {
 	return at
 }
 
-// TCPAddr returns a standard library net.UDPAddr from p.
+// TCPAddr returns a standard library net.TCPAddr from p.
 // The returned value is always non-nil. If p.IP is the zero
 // value, then TCPAddr.IP is nil.
 func (p IPPort) TCPAddr() *net.TCPAddr {
