@@ -56,6 +56,7 @@ func TestInlining(t *testing.T) {
 		"IP.Is6",
 		"IP.IsLoopback",
 		"IP.IsMulticast",
+		"IP.IsInterfaceLocalMulticast",
 		"IP.IsZero",
 		"IP.Less",
 		"IP.lessOrEq",

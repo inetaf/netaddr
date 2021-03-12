@@ -508,14 +508,18 @@ func TestIPProperties(t *testing.T) {
 
 		loopback4 = mustIP("127.0.0.1")
 		loopback6 = mustIP("::1")
+
+		ilm6     = mustIP("ff01::1")
+		ilmZone6 = mustIP("ff01::1%eth0")
 	)
 
 	tests := []struct {
-		name             string
-		ip               IP
-		multicast        bool
-		linkLocalUnicast bool
-		loopback         bool
+		name                    string
+		ip                      IP
+		multicast               bool
+		interfaceLocalMulticast bool
+		linkLocalUnicast        bool
+		loopback                bool
 	}{
 		{
 			name: "nil",
@@ -573,6 +577,18 @@ func TestIPProperties(t *testing.T) {
 			ip:       loopback6,
 			loopback: true,
 		},
+		{
+			name:                    "interface-local multicast v6Addr",
+			ip:                      ilm6,
+			multicast:               true,
+			interfaceLocalMulticast: true,
+		},
+		{
+			name:                    "interface-local multicast v6AddrZone",
+			ip:                      ilmZone6,
+			multicast:               true,
+			interfaceLocalMulticast: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -590,6 +606,11 @@ func TestIPProperties(t *testing.T) {
 			lo := tt.ip.IsLoopback()
 			if lo != tt.loopback {
 				t.Errorf("IsLoopback(%v) = %v; want %v", tt.ip, lo, tt.loopback)
+			}
+
+			ilm := tt.ip.IsInterfaceLocalMulticast()
+			if ilm != tt.interfaceLocalMulticast {
+				t.Errorf("IsInterfaceLocalMulticast(%v) = %v; want %v", tt.ip, ilm, tt.interfaceLocalMulticast)
 			}
 		})
 	}
@@ -2309,6 +2330,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IP.IsLinkLocalUnicast", func() { sinkBool = MustParseIP("fe80::1").IsLinkLocalUnicast() })
 	test("IP.IsLoopback", func() { sinkBool = MustParseIP("fe80::1").IsLoopback() })
 	test("IP.IsMulticast", func() { sinkBool = MustParseIP("fe80::1").IsMulticast() })
+	test("IP.IsInterfaceLocalMulticast", func() { sinkBool = MustParseIP("fe80::1").IsInterfaceLocalMulticast() })
 	test("IP.Prefix/4", func() { sinkIPPrefix = panicPfx(MustParseIP("1.2.3.4").Prefix(20)) })
 	test("IP.Prefix/6", func() { sinkIPPrefix = panicPfx(MustParseIP("fe80::1").Prefix(64)) })
 	test("IP.As16", func() { sinkIP16 = MustParseIP("1.2.3.4").As16() })
