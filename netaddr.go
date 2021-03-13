@@ -1143,7 +1143,7 @@ func (p IPPrefix) String() string {
 	if !p.Valid() {
 		return "invalid IP prefix"
 	}
-	// TODO remore stdlib impl
+	// TODO remove stdlib impl
 	network := p.IP.IPAddr().IP.Mask(p.IPNet().Mask)
 	return fmt.Sprintf("%s/%d", network, p.Bits)
 }
