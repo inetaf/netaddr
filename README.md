@@ -1,10 +1,10 @@
-# netaddr
+# netaddr [![Test Status](https://github.com/inetaf/netaddr/workflows/Linux/badge.svg)](https://github.com/mdlayher/ethtool/actions) [![Go Reference](https://pkg.go.dev/badge/inet.af/netaddr.svg)](https://pkg.go.dev/inet.af/netaddr)
 
 ## What
 
 This is a package containing a new IP address type for Go.
 
-See its docs: https://godoc.org/inet.af/netaddr
+See its docs: https://pkg.go.dev/inet.af/netaddr
 
 ## Motivation
 
