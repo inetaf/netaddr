@@ -1143,7 +1143,9 @@ func (p IPPrefix) String() string {
 	if !p.Valid() {
 		return "invalid IP prefix"
 	}
-	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
+	// TODO remore stdlib impl
+	network := p.IP.IPAddr().IP.Mask(p.IPNet().Mask)
+	return fmt.Sprintf("%s/%d", network, p.Bits)
 }
 
 // lastIP returns the last IP in the prefix.

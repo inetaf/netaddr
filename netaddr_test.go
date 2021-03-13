@@ -964,17 +964,19 @@ func TestIPPrefixMasked(t *testing.T) {
 
 func TestIPPrefix(t *testing.T) {
 	tests := []struct {
-		prefix      string
-		ip          IP
-		bits        uint8
-		ipNet       *net.IPNet
-		contains    []IP
-		notContains []IP
+		prefix       string
+		prefixString string
+		ip           IP
+		bits         uint8
+		ipNet        *net.IPNet
+		contains     []IP
+		notContains  []IP
 	}{
 		{
-			prefix: "192.168.0.0/24",
-			ip:     mustIP("192.168.0.0"),
-			bits:   24,
+			prefix:       "192.168.0.0/24",
+			prefixString: "192.168.0.0/24",
+			ip:           mustIP("192.168.0.0"),
+			bits:         24,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("192.168.0.0"),
 				Mask: net.CIDRMask(24, 32),
@@ -983,9 +985,22 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("192.168.1.1", "1.1.1.1"),
 		},
 		{
-			prefix: "192.168.1.1/32",
-			ip:     mustIP("192.168.1.1"),
-			bits:   32,
+			prefix:       "192.168.0.1/24",
+			prefixString: "192.168.0.0/24",
+			ip:           mustIP("192.168.0.1"),
+			bits:         24,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("192.168.0.1"),
+				Mask: net.CIDRMask(24, 32),
+			},
+			contains:    mustIPs("192.168.0.1", "192.168.0.55"),
+			notContains: mustIPs("192.168.1.1", "1.1.1.1"),
+		},
+		{
+			prefix:       "192.168.1.1/32",
+			prefixString: "192.168.1.1/32",
+			ip:           mustIP("192.168.1.1"),
+			bits:         32,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("192.168.1.1"),
 				Mask: net.CIDRMask(32, 32),
@@ -994,9 +1009,10 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("192.168.1.2"),
 		},
 		{
-			prefix: "100.64.0.0/10", // CGNAT range; prefix not multiple of 8
-			ip:     mustIP("100.64.0.0"),
-			bits:   10,
+			prefix:       "100.64.0.0/10", // CGNAT range; prefix not multiple of 8
+			prefixString: "100.64.0.0/10", // CGNAT range; prefix not multiple of 8
+			ip:           mustIP("100.64.0.0"),
+			bits:         10,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("100.64.0.0"),
 				Mask: net.CIDRMask(10, 32),
@@ -1005,9 +1021,10 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("100.63.255.255", "100.128.0.0"),
 		},
 		{
-			prefix: "2001:db8::/96",
-			ip:     mustIP("2001:db8::"),
-			bits:   96,
+			prefix:       "2001:db8::/96",
+			prefixString: "2001:db8::/96",
+			ip:           mustIP("2001:db8::"),
+			bits:         96,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("2001:db8::"),
 				Mask: net.CIDRMask(96, 128),
@@ -1016,9 +1033,10 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("2001:db8::1:aaaa:bbbb", "2001:db9::"),
 		},
 		{
-			prefix: "0.0.0.0/0",
-			ip:     mustIP("0.0.0.0"),
-			bits:   0,
+			prefix:       "0.0.0.0/0",
+			prefixString: "0.0.0.0/0",
+			ip:           mustIP("0.0.0.0"),
+			bits:         0,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("0.0.0.0"),
 				Mask: net.CIDRMask(0, 32),
@@ -1027,9 +1045,10 @@ func TestIPPrefix(t *testing.T) {
 			notContains: append(mustIPs("2001:db8::1"), IP{}),
 		},
 		{
-			prefix: "::/0",
-			ip:     mustIP("::"),
-			bits:   0,
+			prefix:       "::/0",
+			prefixString: "::/0",
+			ip:           mustIP("::"),
+			bits:         0,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("::"),
 				Mask: net.CIDRMask(0, 128),
@@ -1038,11 +1057,24 @@ func TestIPPrefix(t *testing.T) {
 			notContains: mustIPs("192.0.2.1"),
 		},
 		{
-			prefix: "2000::/3",
-			ip:     mustIP("2000::"),
-			bits:   3,
+			prefix:       "2000::/3",
+			prefixString: "2000::/3",
+			ip:           mustIP("2000::"),
+			bits:         3,
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("2000::"),
+				Mask: net.CIDRMask(3, 128),
+			},
+			contains:    mustIPs("2001:db8::1"),
+			notContains: mustIPs("fe80::1"),
+		},
+		{
+			prefix:       "2000::1/3",
+			prefixString: "2000::/3",
+			ip:           mustIP("2000::1"),
+			bits:         3,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("2000::1"),
 				Mask: net.CIDRMask(3, 128),
 			},
 			contains:    mustIPs("2001:db8::1"),
@@ -1075,7 +1107,7 @@ func TestIPPrefix(t *testing.T) {
 					t.Errorf("contains %s", ip)
 				}
 			}
-			if got := prefix.String(); got != test.prefix {
+			if got := prefix.String(); got != test.prefixString {
 				t.Errorf("prefix.String()=%q, want %q", got, test.prefix)
 			}
 		})
