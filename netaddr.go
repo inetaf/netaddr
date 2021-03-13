@@ -564,6 +564,28 @@ func (ip IP) IsMulticast() bool {
 	return false // zero value
 }
 
+// IsInterfaceLocalMulticast reports whether ip is an IPv6 interface-local
+// multicast address. If ip is the zero value or an IPv4 address, it will return
+// false.
+func (ip IP) IsInterfaceLocalMulticast() bool {
+	if ip.Is6() {
+		return ip.v6u16(0)&0xff0f == 0xff01
+	}
+	return false // zero value
+}
+
+// IsLinkLocalMulticast reports whether ip is a link-local multicast address.
+// If ip is the zero value, it will return false.
+func (ip IP) IsLinkLocalMulticast() bool {
+	if ip.Is4() {
+		return ip.v4(0) == 224 && ip.v4(1) == 0 && ip.v4(2) == 0
+	}
+	if ip.Is6() {
+		return ip.v6u16(0)&0xff0f == 0xff02
+	}
+	return false // zero value
+}
+
 // Prefix applies a CIDR mask of leading bits to IP, producing an IPPrefix
 // of the specified length. If IP is the zero value, a zero-value IPPrefix and
 // a nil error are returned. If bits is larger than 32 for an IPv4 address or
