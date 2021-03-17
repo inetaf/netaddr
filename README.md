@@ -1,4 +1,4 @@
-# netaddr [![Test Status](https://github.com/inetaf/netaddr/workflows/Linux/badge.svg)](https://github.com/mdlayher/ethtool/actions) [![Go Reference](https://pkg.go.dev/badge/inet.af/netaddr.svg)](https://pkg.go.dev/inet.af/netaddr)
+# netaddr [![Test Status](https://github.com/inetaf/netaddr/workflows/Linux/badge.svg)](https://github.com/inetaf/netaddr/actions) [![Go Reference](https://pkg.go.dev/badge/inet.af/netaddr.svg)](https://pkg.go.dev/inet.af/netaddr)
 
 ## What
 
