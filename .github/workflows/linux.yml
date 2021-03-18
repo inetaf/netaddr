@@ -26,5 +26,11 @@ jobs:
     - name: Check out code into the Go module directory
       uses: actions/checkout@v1
 
+    - name: Check Go modules
+      if: matrix.go-version == '1.16'
+      run: |
+        go mod tidy
+        git diff --exit-code
+
     - name: Run tests on linux
       run: go test ./...
