@@ -613,7 +613,7 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 // zero value, a zero-value IPPrefix and a nil error are returned. If the
 // netmask length is not 4 for IPv4 or 16 for IPv6, an error is
 // returned. If the netmask is non-contiguous, an error is returned.
-func (ip *IP) Netmask(mask []byte) (IPPrefix, error) {
+func (ip IP) Netmask(mask []byte) (IPPrefix, error) {
 	l := len(mask)
 
 	switch ip.z {
