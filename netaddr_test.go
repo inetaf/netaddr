@@ -1823,6 +1823,14 @@ func BenchmarkIPPrefixMasking(b *testing.B) {
 	}
 }
 
+func BenchmarkIPPrefixMarshalText(b *testing.B) {
+	b.ReportAllocs()
+	ipp := MustParseIPPrefix("66.55.44.33/22")
+	for i := 0; i < b.N; i++ {
+		sinkBytes, _ = ipp.MarshalText()
+	}
+}
+
 func BenchmarkParseIPPort(b *testing.B) {
 	for _, test := range parseBenchInputs {
 		var ipp string
@@ -2413,6 +2421,7 @@ var (
 	sinkIP4           [4]byte
 	sinkBool          bool
 	sinkString        string
+	sinkBytes         []byte
 	sinkUDPAddr       = &net.UDPAddr{IP: make(net.IP, 0, 16)}
 )
 
