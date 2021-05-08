@@ -75,7 +75,6 @@ func TestInlining(t *testing.T) {
 		"IPPort.UDPAddrAt",
 		"IPPrefix.IsSingleIP",
 		"IPPrefix.IsZero",
-		"IPPrefix.MarshalText",
 		"IPPrefix.Masked",
 		"IPPrefix.Valid",
 		"IPRange.Prefixes",
