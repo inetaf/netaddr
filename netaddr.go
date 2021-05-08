@@ -794,10 +794,18 @@ func (ip IP) appendTo6(ret []byte) []byte {
 // The encoding is the same as returned by String, with one exception:
 // If ip is the zero value, the encoding is the empty string.
 func (ip IP) MarshalText() ([]byte, error) {
-	if ip.z == z0 {
+	switch ip.z {
+	case z0:
 		return []byte(""), nil
+	case z4:
+		max := len("255.255.255.255")
+		b := make([]byte, 0, max)
+		return ip.appendTo4(b), nil
+	default:
+		max := len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0")
+		b := make([]byte, 0, max)
+		return ip.appendTo6(b), nil
 	}
-	return []byte(ip.String()), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.

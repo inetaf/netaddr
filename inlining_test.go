@@ -60,7 +60,6 @@ func TestInlining(t *testing.T) {
 		"IP.IsZero",
 		"IP.Less",
 		"IP.lessOrEq",
-		"IP.MarshalText",
 		"IP.Next",
 		"IP.Prior",
 		"IP.Unmap",

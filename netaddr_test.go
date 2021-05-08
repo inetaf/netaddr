@@ -1821,6 +1821,14 @@ func BenchmarkIPString(b *testing.B) {
 	}
 }
 
+func BenchmarkIPMarshalText(b *testing.B) {
+	b.ReportAllocs()
+	ip := MustParseIP("66.55.44.33")
+	for i := 0; i < b.N; i++ {
+		sinkBytes, _ = ip.MarshalText()
+	}
+}
+
 func BenchmarkIPPrefixMasking(b *testing.B) {
 	tests := []struct {
 		name string
