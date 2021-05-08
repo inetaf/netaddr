@@ -723,6 +723,11 @@ func appendHex(b []byte, x uint16) []byte {
 func (ip IP) string4() string {
 	const max = len("255.255.255.255")
 	ret := make([]byte, 0, max)
+	ret = ip.appendTo4(ret)
+	return string(ret)
+}
+
+func (ip IP) appendTo4(ret []byte) []byte {
 	ret = appendDecimal(ret, ip.v4(0))
 	ret = append(ret, '.')
 	ret = appendDecimal(ret, ip.v4(1))
@@ -730,7 +735,7 @@ func (ip IP) string4() string {
 	ret = appendDecimal(ret, ip.v4(2))
 	ret = append(ret, '.')
 	ret = appendDecimal(ret, ip.v4(3))
-	return string(ret)
+	return ret
 }
 
 // string6 formats ip in IPv6 textual representation. It follows the
@@ -739,6 +744,20 @@ func (ip IP) string4() string {
 // zeros, use :: to elide the longest run of zeros, and don't use ::
 // to compact a single zero field.
 func (ip IP) string6() string {
+	// Use a zone with a "plausibly long" name, so that most zone-ful
+	// IP addresses won't require additional allocation.
+	//
+	// The compiler does a cool optimization here, where ret ends up
+	// stack-allocated and so the only allocation this function does
+	// is to construct the returned string. As such, it's okay to be a
+	// bit greedy here, size-wise.
+	const max = len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0")
+	ret := make([]byte, 0, max)
+	ret = ip.appendTo6(ret)
+	return string(ret)
+}
+
+func (ip IP) appendTo6(ret []byte) []byte {
 	zeroStart, zeroEnd := uint8(255), uint8(255)
 	for i := uint8(0); i < 8; i++ {
 		j := i
@@ -750,15 +769,6 @@ func (ip IP) string6() string {
 		}
 	}
 
-	// Use a zone with a "plausibly long" name, so that most zone-ful
-	// IP addresses won't require additional allocation.
-	//
-	// The compiler does a cool optimization here, where ret ends up
-	// stack-allocated and so the only allocation this function does
-	// is to construct the returned string. As such, it's okay to be a
-	// bit greedy here, size-wise.
-	const max = len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0")
-	ret := make([]byte, 0, max)
 	for i := uint8(0); i < 8; i++ {
 		if i == zeroStart {
 			ret = append(ret, ':', ':')
@@ -777,7 +787,7 @@ func (ip IP) string6() string {
 		ret = append(ret, '%')
 		ret = append(ret, ip.Zone()...)
 	}
-	return string(ret)
+	return ret
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,
@@ -1164,11 +1174,28 @@ func (p IPPrefix) Overlaps(o IPPrefix) bool {
 // The encoding is the same as returned by String, with one exception:
 // If p is the zero value, the encoding is the empty string.
 func (p IPPrefix) MarshalText() ([]byte, error) {
-	if p == (IPPrefix{}) {
+	if p.IsZero() {
 		return []byte(""), nil
 	}
+	if !p.Valid() {
+		return []byte("invalid IP prefix"), nil
+	}
 
-	return []byte(p.String()), nil
+	// p.IP is non-zero, because p is valid.
+	var b []byte
+	if p.IP.z == z4 {
+		max := len("255.255.255.255/32")
+		b = make([]byte, 0, max)
+		b = p.IP.appendTo4(b)
+	} else {
+		max := len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0/128")
+		b = make([]byte, 0, max)
+		b = p.IP.appendTo6(b)
+	}
+
+	b = append(b, '/')
+	b = appendDecimal(b, p.Bits)
+	return b, nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler interface.
