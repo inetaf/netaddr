@@ -68,7 +68,6 @@ func TestInlining(t *testing.T) {
 		"IP.v6",
 		"IP.v6u16",
 		"IPPort.IsZero",
-		"IPPort.MarshalText",
 		"IPPort.TCPAddr",
 		"IPPort.UDPAddr",
 		"IPPort.UDPAddrAt",
