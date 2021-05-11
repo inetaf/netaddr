@@ -1829,6 +1829,32 @@ func BenchmarkIPMarshalText(b *testing.B) {
 	}
 }
 
+func BenchmarkIPPortString(b *testing.B) {
+	for _, test := range parseBenchInputs {
+		ip := MustParseIP(test.ip)
+		ipp := IPPort{IP: ip, Port: 60000}
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				sinkString = ipp.String()
+			}
+		})
+	}
+}
+
+func BenchmarkIPPortMarshalText(b *testing.B) {
+	for _, test := range parseBenchInputs {
+		ip := MustParseIP(test.ip)
+		ipp := IPPort{IP: ip, Port: 60000}
+		b.Run(test.name, func(b *testing.B) {
+			b.ReportAllocs()
+			for i := 0; i < b.N; i++ {
+				sinkBytes, _ = ipp.MarshalText()
+			}
+		})
+	}
+}
+
 func BenchmarkIPPrefixMasking(b *testing.B) {
 	tests := []struct {
 		name string
