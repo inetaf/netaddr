@@ -948,10 +948,25 @@ func (p IPPort) String() string {
 // encoding is the same as returned by String, with one exception: if
 // p.IP is the zero value, the encoding is the empty string.
 func (p IPPort) MarshalText() ([]byte, error) {
-	if p.IP.z == z0 {
+	switch p.IP.z {
+	case z0:
 		return []byte(""), nil
+	case z4:
+		max := len("255.255.255.255:65535")
+		b := make([]byte, 0, max)
+		b = p.IP.appendTo4(b)
+		b = append(b, ':')
+		b = strconv.AppendInt(b, int64(p.Port), 10)
+		return b, nil
+	default:
+		max := len("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0]:65535")
+		b := make([]byte, 1, max)
+		b[0] = '['
+		b = p.IP.appendTo6(b)
+		b = append(b, ']', ':')
+		b = strconv.AppendInt(b, int64(p.Port), 10)
+		return b, nil
 	}
-	return []byte(p.String()), nil
 }
 
 // UnmarshalText implements the encoding.TextUnmarshaler
