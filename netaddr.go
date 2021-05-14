@@ -865,13 +865,26 @@ func (ip *IP) UnmarshalBinary(b []byte) error {
 	return fmt.Errorf("netaddr: unexpected ip size: %v", len(b))
 }
 
-// IPPort is an IP & port number.
-//
-// It's meant to be used as a value type.
+// IPPort is an IP and a port number.
 type IPPort struct {
-	IP   IP
-	Port uint16
+	ip   IP
+	port uint16
 }
+
+// IPPortFrom returns an IPPort with ip ip and port port.
+func IPPortFrom(ip IP, port uint16) IPPort { return IPPort{ip: ip, port: port} }
+
+// WithIP returns an IPPort with ip ip and port p.Port().
+func (p IPPort) WithIP(ip IP) IPPort { return IPPort{ip: ip, port: p.port} }
+
+// WithIP returns an IPPort with ip p.IP() and port port.
+func (p IPPort) WithPort(port uint16) IPPort { return IPPort{ip: p.ip, port: port} }
+
+// IP returns p's IP.
+func (p IPPort) IP() IP { return p.ip }
+
+// Port returns p's port.
+func (p IPPort) Port() uint16 { return p.port }
 
 // splitIPPort splits s into an IP address string and a port
 // string. It splits strings shaped like "foo:bar" or "[foo]:bar",
@@ -915,14 +928,14 @@ func ParseIPPort(s string) (IPPort, error) {
 	if err != nil {
 		return ipp, fmt.Errorf("invalid port %q parsing %q", port, s)
 	}
-	ipp.Port = uint16(port16)
-	ipp.IP, err = ParseIP(ip)
+	ipp.port = uint16(port16)
+	ipp.ip, err = ParseIP(ip)
 	if err != nil {
 		return IPPort{}, err
 	}
-	if v6 && ipp.IP.Is4() {
+	if v6 && ipp.ip.Is4() {
 		return IPPort{}, fmt.Errorf("invalid ip:port %q, square brackets can only be used with IPv6 addresses", s)
-	} else if !v6 && ipp.IP.Is6() {
+	} else if !v6 && ipp.ip.Is6() {
 		return IPPort{}, fmt.Errorf("invalid ip:port %q, IPv6 addresses must be surrounded by square brackets", s)
 	}
 	return ipp, nil
@@ -942,35 +955,35 @@ func MustParseIPPort(s string) IPPort {
 func (p IPPort) IsZero() bool { return p == IPPort{} }
 
 func (p IPPort) String() string {
-	if p.IP.z == z4 {
-		a := p.IP.As4()
-		return fmt.Sprintf("%d.%d.%d.%d:%d", a[0], a[1], a[2], a[3], p.Port)
+	if p.ip.z == z4 {
+		a := p.ip.As4()
+		return fmt.Sprintf("%d.%d.%d.%d:%d", a[0], a[1], a[2], a[3], p.port)
 	}
 	// TODO: this could be more efficient allocation-wise:
-	return net.JoinHostPort(p.IP.String(), strconv.Itoa(int(p.Port)))
+	return net.JoinHostPort(p.ip.String(), strconv.Itoa(int(p.port)))
 }
 
 // MarshalText implements the encoding.TextMarshaler interface. The
 // encoding is the same as returned by String, with one exception: if
-// p.IP is the zero value, the encoding is the empty string.
+// p.IP() is the zero value, the encoding is the empty string.
 func (p IPPort) MarshalText() ([]byte, error) {
-	switch p.IP.z {
+	switch p.ip.z {
 	case z0:
 		return []byte(""), nil
 	case z4:
 		max := len("255.255.255.255:65535")
 		b := make([]byte, 0, max)
-		b = p.IP.appendTo4(b)
+		b = p.ip.appendTo4(b)
 		b = append(b, ':')
-		b = strconv.AppendInt(b, int64(p.Port), 10)
+		b = strconv.AppendInt(b, int64(p.port), 10)
 		return b, nil
 	default:
 		max := len("[ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0]:65535")
 		b := make([]byte, 1, max)
 		b[0] = '['
-		b = p.IP.appendTo6(b)
+		b = p.ip.appendTo6(b)
 		b = append(b, ']', ':')
-		b = strconv.AppendInt(b, int64(p.Port), 10)
+		b = strconv.AppendInt(b, int64(p.port), 10)
 		return b, nil
 	}
 }
@@ -980,7 +993,7 @@ func (p IPPort) MarshalText() ([]byte, error) {
 // ParseIPPort. It returns an error if *p is not the IPPort zero
 // value.
 func (p *IPPort) UnmarshalText(text []byte) error {
-	if p.IP.z != z0 || p.Port != 0 {
+	if p.ip.z != z0 || p.port != 0 {
 		return errors.New("netaddr: refusing to UnmarshalText into non-zero IP")
 	}
 	if len(text) == 0 {
@@ -1006,20 +1019,20 @@ func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
 		}
 		ip = ip.WithZone(zone)
 	}
-	return IPPort{IP: ip, Port: uint16(port)}, true
+	return IPPort{ip: ip, port: uint16(port)}, true
 }
 
 // UDPAddr returns a standard library net.UDPAddr from p.
-// The returned value is always non-nil. If p.IP is the zero
+// The returned value is always non-nil. If p.IP() is the zero
 // value, then UDPAddr.IP is nil.
 //
 // UDPAddr necessarily does two allocations. If you have an existing
 // UDPAddr already allocated, see UDPAddrAt.
 func (p IPPort) UDPAddr() *net.UDPAddr {
 	ret := &net.UDPAddr{
-		Port: int(p.Port),
+		Port: int(p.port),
 	}
-	ret.IP, ret.Zone = p.IP.ipZone(nil)
+	ret.IP, ret.Zone = p.ip.ipZone(nil)
 	return ret
 }
 
@@ -1028,19 +1041,19 @@ func (p IPPort) UDPAddr() *net.UDPAddr {
 // allocation-free. It returns at to facilitate using this method as a
 // wrapper.
 func (p IPPort) UDPAddrAt(at *net.UDPAddr) *net.UDPAddr {
-	at.Port = int(p.Port)
-	at.IP, at.Zone = p.IP.ipZone(at.IP)
+	at.Port = int(p.port)
+	at.IP, at.Zone = p.ip.ipZone(at.IP)
 	return at
 }
 
 // TCPAddr returns a standard library net.TCPAddr from p.
-// The returned value is always non-nil. If p.IP is the zero
+// The returned value is always non-nil. If p.IP() is the zero
 // value, then TCPAddr.IP is nil.
 func (p IPPort) TCPAddr() *net.TCPAddr {
-	ip, zone := p.IP.ipZone(nil)
+	ip, zone := p.ip.ipZone(nil)
 	return &net.TCPAddr{
 		IP:   ip,
-		Port: int(p.Port),
+		Port: int(p.port),
 		Zone: zone,
 	}
 }
@@ -1054,8 +1067,8 @@ type IPPrefix struct {
 	Bits uint8
 }
 
-// Valid reports whether whether p.Bits has a valid range for p.IP.
-// If p.IP is zero, Valid returns false.
+// Valid reports whether whether p.Bits has a valid range for p.IP().
+// If p.IP() is zero, Valid returns false.
 func (p IPPrefix) Valid() bool { return !p.IP.IsZero() && p.Bits <= p.IP.BitLen() }
 
 // IsZero reports whether p is its zero value.

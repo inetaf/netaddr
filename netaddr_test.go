@@ -1642,7 +1642,7 @@ func TestUDPAddrAllocs(t *testing.T) {
 		ua := &net.UDPAddr{IP: make(net.IP, 0, 16)}
 		n := int(testing.AllocsPerRun(1000, func() {
 			ua := ipp.UDPAddrAt(ua)
-			if ua.Port != int(ipp.Port) {
+			if ua.Port != int(ipp.Port()) {
 				t.Fatal("UDPAddr returned bogus result")
 			}
 		}))
@@ -1847,7 +1847,7 @@ func BenchmarkIPMarshalText(b *testing.B) {
 func BenchmarkIPPortString(b *testing.B) {
 	for _, test := range parseBenchInputs {
 		ip := MustParseIP(test.ip)
-		ipp := IPPort{IP: ip, Port: 60000}
+		ipp := IPPortFrom(ip, 60000)
 		b.Run(test.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
@@ -1860,7 +1860,7 @@ func BenchmarkIPPortString(b *testing.B) {
 func BenchmarkIPPortMarshalText(b *testing.B) {
 	for _, test := range parseBenchInputs {
 		ip := MustParseIP(test.ip)
-		ipp := IPPort{IP: ip, Port: 60000}
+		ipp := IPPortFrom(ip, 60000)
 		b.Run(test.name, func(b *testing.B) {
 			b.ReportAllocs()
 			for i := 0; i < b.N; i++ {
@@ -2638,6 +2638,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IP.Prior", func() { sinkIP = MustParseIP("1.2.3.4").Prior() })
 
 	// IPPort constructors
+	test("IPPortFrom", func() { sinkIPPort = IPPortFrom(IPv4(1, 2, 3, 4), 22) })
 	test("ParseIPPort", func() { sinkIPPort = panicIPP(ParseIPPort("[::1]:1234")) })
 	test("MustParseIPPort", func() { sinkIPPort = MustParseIPPort("[::1]:1234") })
 	test("FromStdAddr", func() {
