@@ -80,6 +80,7 @@ func TestInlining(t *testing.T) {
 		"IPRange.prefixFrom128AndBits-fm",
 		"IPRange.entirelyBefore",
 		"IPv4",
+		"IPFrom4",
 		"IPv6LinkLocalAllNodes",
 		"IPv6Unspecified",
 		"MustParseIP",
