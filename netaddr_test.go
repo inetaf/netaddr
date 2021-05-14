@@ -2129,7 +2129,7 @@ func TestRangePrefixes(t *testing.T) {
 		)},
 	}
 	for _, tt := range tests {
-		r := IPRange{From: mustIP(tt.from), To: mustIP(tt.to)}
+		r := IPRangeFrom(mustIP(tt.from), mustIP(tt.to))
 		got := r.Prefixes()
 		if !reflect.DeepEqual(got, tt.want) {
 			t.Errorf("failed %s->%s. got:", tt.from, tt.to)
@@ -2193,7 +2193,7 @@ func TestIPRangeContains(t *testing.T) {
 		rtests []rtest
 	}{
 		{
-			IPRange{From: mustIP("10.0.0.2"), To: mustIP("10.0.0.4")},
+			IPRangeFrom(mustIP("10.0.0.2"), mustIP("10.0.0.4")),
 			[]rtest{
 				{mustIP("10.0.0.1"), false},
 				{mustIP("10.0.0.2"), true},
@@ -2205,7 +2205,7 @@ func TestIPRangeContains(t *testing.T) {
 			},
 		},
 		{
-			IPRange{From: mustIP("::1"), To: mustIP("::ffff")},
+			IPRangeFrom(mustIP("::1"), mustIP("::ffff")),
 			[]rtest{
 				{mustIP("::0"), false},
 				{mustIP("::1"), true},
@@ -2216,7 +2216,7 @@ func TestIPRangeContains(t *testing.T) {
 			},
 		},
 		{
-			IPRange{From: mustIP("10.0.0.2"), To: mustIP("::")}, // invalid
+			IPRangeFrom(mustIP("10.0.0.2"), mustIP("::")), // invalid
 			[]rtest{
 				{mustIP("10.0.0.2"), false},
 			},
@@ -2308,7 +2308,7 @@ func TestIPRangeValid(t *testing.T) {
 	for _, tt := range tests {
 		got := tt.r.Valid()
 		if got != tt.want {
-			t.Errorf("range %v to %v Valid = %v; want %v", tt.r.From, tt.r.To, got, tt.want)
+			t.Errorf("range %v to %v Valid = %v; want %v", tt.r.From(), tt.r.To(), got, tt.want)
 		}
 	}
 }
@@ -2655,6 +2655,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IPPRefix.Range", func() { sinkIPRange = MustParseIPPrefix("1.2.3.4/16").Range() })
 
 	// IPRange constructors
+	test("IPRangeFrom", func() { sinkIPRange = IPRangeFrom(IPv4(1, 2, 3, 4), IPv4(4, 3, 2, 1)) })
 	test("ParseIPRange", func() { sinkIPRange = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")) })
 
 	// IPRange methods

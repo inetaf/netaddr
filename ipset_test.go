@@ -314,7 +314,7 @@ func TestIPSet(t *testing.T) {
 			t.Run("ranges", func(t *testing.T) {
 				for _, v := range got {
 					if !v.Valid() {
-						t.Errorf("invalid IPRange in result: %s -> %s", v.From, v.To)
+						t.Errorf("invalid IPRange in result: %s -> %s", v.From(), v.To())
 					}
 				}
 				if reflect.DeepEqual(got, tt.wantRanges) {
@@ -322,11 +322,11 @@ func TestIPSet(t *testing.T) {
 				}
 				t.Error("failed. got:\n")
 				for _, v := range got {
-					t.Errorf("  %s -> %s", v.From, v.To)
+					t.Errorf("  %s -> %s", v.From(), v.To())
 				}
 				t.Error("want:\n")
 				for _, v := range tt.wantRanges {
-					t.Errorf("  %s -> %s", v.From, v.To)
+					t.Errorf("  %s -> %s", v.From(), v.To())
 				}
 			})
 			if tt.wantPrefixes != nil {
@@ -575,11 +575,11 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 		switch op {
 		case 0:
 			steps = append(steps, fmt.Sprintf("add 0.0.0.%d-0.0.0.%d", ip1, ip2))
-			b.AddRange(IPRange{From: IPv4(0, 0, 0, ip1), To: IPv4(0, 0, 0, ip2)})
+			b.AddRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
 			v = true
 		case 1:
 			steps = append(steps, fmt.Sprintf("remove 0.0.0.%d-0.0.0.%d", ip1, ip2))
-			b.RemoveRange(IPRange{From: IPv4(0, 0, 0, ip1), To: IPv4(0, 0, 0, ip2)})
+			b.RemoveRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
 		}
 		for i := ip1; i <= ip2; i++ {
 			wantContains[i] = v
@@ -609,7 +609,7 @@ func TestIPSetRanges(t *testing.T) {
 		var from, to IP
 		ranges := make([]IPRange, 0)
 		flush := func() {
-			r := IPRange{From: from, To: to}
+			r := IPRangeFrom(from, to)
 			build.AddRange(r)
 			ranges = append(ranges, r)
 			from, to = IP{}, IP{}
@@ -651,10 +651,9 @@ func TestIPSetRangesStress(t *testing.T) {
 		if a > b {
 			a, b = b, a
 		}
-		return a, b, IPRange{
-			From: IPv4(0, 0, uint8(a>>8), uint8(a)),
-			To:   IPv4(0, 0, uint8(b>>8), uint8(b)),
-		}
+		from := IPv4(0, 0, uint8(a>>8), uint8(a))
+		to := IPv4(0, 0, uint8(b>>8), uint8(b))
+		return a, b, IPRangeFrom(from, to)
 	}
 	for i := 0; i < n; i++ {
 		var build IPSetBuilder
@@ -682,7 +681,7 @@ func TestIPSetRangesStress(t *testing.T) {
 			if i == 0 {
 				continue
 			}
-			if ranges[i-1].To.Compare(r.From) != -1 {
+			if ranges[i-1].To().Compare(r.From()) != -1 {
 				t.Fatalf("overlapping ranges: %v", ranges)
 			}
 		}

@@ -16,16 +16,16 @@ func ExampleIPSet() {
 	b.AddPrefix(netaddr.MustParseIPPrefix("10.0.0.0/8"))
 	b.RemovePrefix(netaddr.MustParseIPPrefix("10.0.0.0/16"))
 
-	b.AddRange(netaddr.IPRange{
-		From: netaddr.MustParseIP("fed0::0400"),
-		To:   netaddr.MustParseIP("fed0::04ff"),
-	})
+	b.AddRange(netaddr.IPRangeFrom(
+		netaddr.MustParseIP("fed0::0400"),
+		netaddr.MustParseIP("fed0::04ff"),
+	))
 
 	s := b.IPSet()
 
 	fmt.Println("Ranges:")
 	for _, r := range s.Ranges() {
-		fmt.Printf("  %s - %s\n", r.From, r.To)
+		fmt.Printf("  %s - %s\n", r.From(), r.To())
 	}
 
 	fmt.Println("Prefixes:")
