@@ -121,6 +121,12 @@ func IPFrom16(addr [16]byte) IP {
 	return IPv6Raw(addr).Unmap()
 }
 
+// IPFrom4 returns the IPv4 address given by the bytes in addr.
+// It is equivalent to calling IPv4(addr[0], addr[1], addr[2], addr[3]).
+func IPFrom4(addr [4]byte) IP {
+	return IPv4(addr[0], addr[1], addr[2], addr[3])
+}
+
 // ParseIP parses s as an IP address, returning the result. The string
 // s can be in dotted decimal ("192.0.2.1"), IPv6 ("2001:db8::68"),
 // or IPv6 with a scoped addressing zone ("fe80::1cc0:3e8c:119f:c2e1%ens18").

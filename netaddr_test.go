@@ -310,6 +310,21 @@ func TestParseIP(t *testing.T) {
 	}
 }
 
+func TestIPv4Constructors(t *testing.T) {
+	ips := []IP{
+		IPv4(1, 2, 3, 4),
+		IPFrom4([4]byte{1, 2, 3, 4}),
+		MustParseIP("1.2.3.4"),
+	}
+	for i := range ips {
+		for j := i + 1; j < len(ips); j++ {
+			if ips[i] != ips[j] {
+				t.Errorf("%v != %v", ips[i], ips[j])
+			}
+		}
+	}
+}
+
 func TestIPMarshalUnmarshalBinary(t *testing.T) {
 	tests := []struct {
 		ip       string
@@ -2578,6 +2593,7 @@ func TestNoAllocs(t *testing.T) {
 
 	// IP constructors
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
+	test("IPFrom4", func() { sinkIP = IPFrom4([4]byte{1, 2, 3, 4}) })
 	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
 	test("IPFrom16", func() { sinkIP = IPFrom16([16]byte{15: 1}) })
 	test("ParseIP/4", func() { sinkIP = panicIP(ParseIP("1.2.3.4")) })
