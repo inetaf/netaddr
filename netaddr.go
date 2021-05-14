@@ -1060,22 +1060,31 @@ func (p IPPort) TCPAddr() *net.TCPAddr {
 
 // IPPrefix is an IP address prefix (CIDR) representing an IP network.
 //
-// The first Bits of IP are specified, the remaining bits match any address.
-// The range of Bits is [0,32] for IPv4 or [0,128] for IPv6.
+// The first Bits() of IP are specified. The remaining bits match any address.
+// The range of Bits() is [0,32] for IPv4 or [0,128] for IPv6.
 type IPPrefix struct {
-	IP   IP
-	Bits uint8
+	ip   IP
+	bits uint8
 }
 
-// Valid reports whether whether p.Bits has a valid range for p.IP().
+// IPPrefixFrom returns an IPPrefix with ip ip and port port.
+func IPPrefixFrom(ip IP, bits uint8) IPPrefix { return IPPrefix{ip: ip, bits: bits} }
+
+// IP returns p's IP.
+func (p IPPrefix) IP() IP { return p.ip }
+
+// Bits returns p's prefix length.
+func (p IPPrefix) Bits() uint8 { return p.bits }
+
+// Valid reports whether whether p.Bits() has a valid range for p.IP().
 // If p.IP() is zero, Valid returns false.
-func (p IPPrefix) Valid() bool { return !p.IP.IsZero() && p.Bits <= p.IP.BitLen() }
+func (p IPPrefix) Valid() bool { return !p.ip.IsZero() && p.bits <= p.ip.BitLen() }
 
 // IsZero reports whether p is its zero value.
 func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
 
 // IsSingleIP reports whether p contains exactly one IP.
-func (p IPPrefix) IsSingleIP() bool { return p.Bits != 0 && p.Bits == p.IP.BitLen() }
+func (p IPPrefix) IsSingleIP() bool { return p.bits != 0 && p.bits == p.ip.BitLen() }
 
 // FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
 // If std is invalid, ok is false.
@@ -1097,8 +1106,8 @@ func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
 	}
 
 	return IPPrefix{
-		IP:   ip,
-		Bits: uint8(ones),
+		ip:   ip,
+		bits: uint8(ones),
 	}, true
 }
 
@@ -1129,8 +1138,8 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): prefix length out of range", s)
 	}
 	return IPPrefix{
-		IP:   ip,
-		Bits: uint8(bits),
+		ip:   ip,
+		bits: uint8(bits),
 	}, nil
 }
 
@@ -1144,10 +1153,10 @@ func MustParseIPPrefix(s string) IPPrefix {
 	return ip
 }
 
-// Masked returns p in its canonical form, with bits of p.IP not in p.Bits masked off.
+// Masked returns p in its canonical form, with bits of p.IP() not in p.Bits() masked off.
 // If p is zero or otherwise invalid, Masked returns the zero value.
 func (p IPPrefix) Masked() IPPrefix {
-	if m, err := p.IP.Prefix(p.Bits); err == nil {
+	if m, err := p.ip.Prefix(p.bits); err == nil {
 		return m
 	}
 	return IPPrefix{}
@@ -1161,7 +1170,7 @@ func (p IPPrefix) Range() IPRange {
 	if p.IsZero() {
 		return IPRange{}
 	}
-	return IPRange{From: p.IP, To: p.lastIP()}
+	return IPRange{From: p.ip, To: p.lastIP()}
 }
 
 // IPNet returns the net.IPNet representation of an IPPrefix.
@@ -1171,10 +1180,10 @@ func (p IPPrefix) IPNet() *net.IPNet {
 	if !p.Valid() {
 		return &net.IPNet{}
 	}
-	stdIP, _ := p.IP.ipZone(nil)
+	stdIP, _ := p.ip.ipZone(nil)
 	return &net.IPNet{
 		IP:   stdIP,
-		Mask: net.CIDRMask(int(p.Bits), int(p.IP.BitLen())),
+		Mask: net.CIDRMask(int(p.bits), int(p.ip.BitLen())),
 	}
 }
 
@@ -1187,7 +1196,7 @@ func (p IPPrefix) Contains(ip IP) bool {
 	if !p.Valid() {
 		return false
 	}
-	if f1, f2 := p.IP.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
+	if f1, f2 := p.ip.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
 		return false
 	}
 	if ip.Is4() {
@@ -1195,16 +1204,16 @@ func (p IPPrefix) Contains(ip IP) bool {
 		// Shift away the number of bits we don't care about.
 		// Shifts in Go are more efficient if the compiler can prove
 		// that the shift amount is smaller than the width of the shifted type (64 here).
-		// We know that p.Bits is in the range 0..32 because p is Valid;
+		// We know that p.bits is in the range 0..32 because p is Valid;
 		// the compiler doesn't know that, so mask with 63 to help it.
 		// Now truncate to 32 bits, because this is IPv4.
 		// If all the bits we care about are equal, the result will be zero.
-		return uint32((ip.addr.lo^p.IP.addr.lo)>>((32-p.Bits)&63)) == 0
+		return uint32((ip.addr.lo^p.ip.addr.lo)>>((32-p.bits)&63)) == 0
 	} else {
 		// xor the IP addresses together.
 		// Mask away the bits we don't care about.
 		// If all the bits we care about are equal, the result will be zero.
-		return ip.addr.xor(p.IP.addr).and(mask6[p.Bits]).isZero()
+		return ip.addr.xor(p.ip.addr).and(mask6[p.bits]).isZero()
 	}
 }
 
@@ -1222,14 +1231,14 @@ func (p IPPrefix) Overlaps(o IPPrefix) bool {
 	if p == o {
 		return true
 	}
-	if p.IP.Is4() != o.IP.Is4() {
+	if p.ip.Is4() != o.ip.Is4() {
 		return false
 	}
 	var minBits uint8
-	if p.Bits < o.Bits {
-		minBits = p.Bits
+	if p.bits < o.bits {
+		minBits = p.bits
 	} else {
-		minBits = o.Bits
+		minBits = o.bits
 	}
 	if minBits == 0 {
 		return true
@@ -1239,13 +1248,13 @@ func (p IPPrefix) Overlaps(o IPPrefix) bool {
 	// so the Prefix call on the one that's already minBits serves to zero
 	// out any remaining bits in IP.
 	var err error
-	if p, err = p.IP.Prefix(minBits); err != nil {
+	if p, err = p.ip.Prefix(minBits); err != nil {
 		return false
 	}
-	if o, err = o.IP.Prefix(minBits); err != nil {
+	if o, err = o.ip.Prefix(minBits); err != nil {
 		return false
 	}
-	return p.IP == o.IP
+	return p.ip == o.ip
 }
 
 // MarshalText implements the encoding.TextMarshaler interface,
@@ -1261,18 +1270,18 @@ func (p IPPrefix) MarshalText() ([]byte, error) {
 
 	// p.IP is non-zero, because p is valid.
 	var b []byte
-	if p.IP.z == z4 {
+	if p.ip.z == z4 {
 		max := len("255.255.255.255/32")
 		b = make([]byte, 0, max)
-		b = p.IP.appendTo4(b)
+		b = p.ip.appendTo4(b)
 	} else {
 		max := len("ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff%enp5s0/128")
 		b = make([]byte, 0, max)
-		b = p.IP.appendTo6(b)
+		b = p.ip.appendTo6(b)
 	}
 
 	b = append(b, '/')
-	b = appendDecimal(b, p.Bits)
+	b = appendDecimal(b, p.bits)
 	return b, nil
 }
 
@@ -1298,7 +1307,7 @@ func (p IPPrefix) String() string {
 	if !p.Valid() {
 		return "invalid IP prefix"
 	}
-	return fmt.Sprintf("%s/%d", p.IP, p.Bits)
+	return fmt.Sprintf("%s/%d", p.ip, p.bits)
 }
 
 // lastIP returns the last IP in the prefix.
@@ -1306,18 +1315,18 @@ func (p IPPrefix) lastIP() IP {
 	if !p.Valid() {
 		return IP{}
 	}
-	a16 := p.IP.As16()
+	a16 := p.ip.As16()
 	var off uint8
 	var bits uint8 = 128
-	if p.IP.Is4() {
+	if p.ip.Is4() {
 		off = 12
 		bits = 32
 	}
-	for b := p.Bits; b < bits; b++ {
+	for b := p.bits; b < bits; b++ {
 		byteNum, bitInByte := b/8, 7-(b%8)
 		a16[off+byteNum] |= 1 << uint(bitInByte)
 	}
-	if p.IP.Is4() {
+	if p.ip.Is4() {
 		return IPFrom16(a16)
 	} else {
 		return IPv6Raw(a16) // doesn't unmap

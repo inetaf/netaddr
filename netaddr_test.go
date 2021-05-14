@@ -1192,11 +1192,11 @@ func TestIPPrefixMasked(t *testing.T) {
 			masked: mustIPPrefix("2000::/3"),
 		},
 		{
-			prefix: IPPrefix{IP: mustIP("2000::"), Bits: 129},
+			prefix: IPPrefixFrom(mustIP("2000::"), 129),
 			masked: IPPrefix{},
 		},
 		{
-			prefix: IPPrefix{IP: mustIP("1.2.3.4"), Bits: 33},
+			prefix: IPPrefixFrom(mustIP("1.2.3.4"), 33),
 			masked: IPPrefix{},
 		},
 	}
@@ -1303,11 +1303,11 @@ func TestIPPrefix(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if prefix.IP != test.ip {
-				t.Errorf("IP=%s, want %s", prefix.IP, test.ip)
+			if prefix.IP() != test.ip {
+				t.Errorf("IP=%s, want %s", prefix.IP(), test.ip)
 			}
-			if prefix.Bits != test.bits {
-				t.Errorf("bits=%d, want %d", prefix.Bits, test.bits)
+			if prefix.Bits() != test.bits {
+				t.Errorf("bits=%d, want %d", prefix.Bits(), test.bits)
 			}
 			stdIPNet := prefix.IPNet()
 			if !test.ipNet.IP.Equal(stdIPNet.IP) || !reflect.DeepEqual(stdIPNet.Mask, test.ipNet.Mask) {
@@ -1771,10 +1771,7 @@ func BenchmarkIPv6(b *testing.B) {
 
 func BenchmarkIPv4Contains(b *testing.B) {
 	b.ReportAllocs()
-	prefix := IPPrefix{
-		IP:   IPv4(192, 168, 1, 0),
-		Bits: 24,
-	}
+	prefix := IPPrefixFrom(IPv4(192, 168, 1, 0), 24)
 	ip := IPv4(192, 168, 1, 1)
 	for i := 0; i < b.N; i++ {
 		prefix.Contains(ip)
@@ -2062,11 +2059,11 @@ func TestIPPrefixOverlaps(t *testing.T) {
 		{pfx("0100::0/8"), pfx("::1/128"), false},
 
 		// v6-mapped v4 should not overlap with IPv4.
-		{IPPrefix{IP: IPv6Raw(mustIP("1.2.0.0").As16()), Bits: 16}, pfx("1.2.3.0/24"), false},
+		{IPPrefixFrom(IPv6Raw(mustIP("1.2.0.0").As16()), 16), pfx("1.2.3.0/24"), false},
 
 		// Invalid prefixes
-		{IPPrefix{IP: mustIP("1.2.3.4"), Bits: 33}, pfx("1.2.3.0/24"), false},
-		{IPPrefix{IP: mustIP("2000::"), Bits: 129}, pfx("2000::/64"), false},
+		{IPPrefixFrom(mustIP("1.2.3.4"), 33), pfx("1.2.3.0/24"), false},
+		{IPPrefixFrom(mustIP("2000::"), 129), pfx("2000::/64"), false},
 	}
 	for i, tt := range tests {
 		if got := tt.a.Overlaps(tt.b); got != tt.want {
@@ -2650,6 +2647,7 @@ func TestNoAllocs(t *testing.T) {
 	test("UDPAddrAt", func() { sinkUDPAddr = MustParseIPPort("1.2.3.4:1234").UDPAddrAt(sinkUDPAddr) })
 
 	// IPPrefix constructors
+	test("IPPrefixFrom", func() { sinkIPPrefix = IPPrefixFrom(IPv4(1, 2, 3, 4), 32) })
 	test("ParseIPPrefix/4", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("1.2.3.4/20")) })
 	test("ParseIPPrefix/6", func() { sinkIPPrefix = panicPfx(ParseIPPrefix("fe80::1/64")) })
 	test("MustParseIPPrefix", func() { sinkIPPrefix = MustParseIPPrefix("1.2.3.4/20") })
