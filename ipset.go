@@ -95,10 +95,10 @@ func (s *IPSetBuilder) normalize() {
 			// f-------------t
 			//    f------t
 			//       out
-			min = append(min, IPRange{From: rin.From, To: rout.From.Prior()})
+			min = append(min, IPRange{from: rin.from, to: rout.from.Prior()})
 			// Adjust in[0], not ir, because we want to consider the
 			// mutated range on the next iteration.
-			in[0].From = rout.To.Next()
+			in[0].from = rout.to.Next()
 			out = out[1:]
 			if debug {
 				debugf("out inside in; split in, append first in, drop out, adjust second in")
@@ -111,7 +111,7 @@ func (s *IPSetBuilder) normalize() {
 			// f------t
 			//    f------t
 			//       in
-			in[0].From = rout.To.Next()
+			in[0].from = rout.to.Next()
 			// Can't move ir onto min yet, another later out might
 			// trim it further. Just discard or and continue.
 			out = out[1:]
@@ -125,7 +125,7 @@ func (s *IPSetBuilder) normalize() {
 			//        f------t
 			//    f------t
 			//       in
-			min = append(min, IPRange{From: rin.From, To: rout.From.Prior()})
+			min = append(min, IPRange{from: rin.from, to: rout.from.Prior()})
 			in = in[1:]
 			if debug {
 				debugf("merge out cuts end of in; append shortened in")
@@ -294,7 +294,7 @@ func (s *IPSet) Contains(ip IP) bool {
 	// TODO: data structure permitting more efficient lookups:
 	// https://github.com/inetaf/netaddr/issues/139
 	i := sort.Search(len(s.rr), func(i int) bool {
-		return ip.Less(s.rr[i].From)
+		return ip.Less(s.rr[i].from)
 	})
 	if i == 0 {
 		return false

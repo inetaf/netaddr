@@ -871,13 +871,14 @@ type IPPort struct {
 	port uint16
 }
 
-// IPPortFrom returns an IPPort with ip ip and port port.
+// IPPortFrom returns an IPPort with IP ip and port port.
+// It does not allocate.
 func IPPortFrom(ip IP, port uint16) IPPort { return IPPort{ip: ip, port: port} }
 
-// WithIP returns an IPPort with ip ip and port p.Port().
+// WithIP returns an IPPort with IP ip and port p.Port().
 func (p IPPort) WithIP(ip IP) IPPort { return IPPort{ip: ip, port: p.port} }
 
-// WithIP returns an IPPort with ip p.IP() and port port.
+// WithIP returns an IPPort with IP p.IP() and port port.
 func (p IPPort) WithPort(port uint16) IPPort { return IPPort{ip: p.ip, port: port} }
 
 // IP returns p's IP.
@@ -1067,7 +1068,8 @@ type IPPrefix struct {
 	bits uint8
 }
 
-// IPPrefixFrom returns an IPPrefix with ip ip and port port.
+// IPPrefixFrom returns an IPPrefix with IP ip and port port.
+// It does not allocate.
 func IPPrefixFrom(ip IP, bits uint8) IPPrefix { return IPPrefix{ip: ip, bits: bits} }
 
 // IP returns p's IP.
@@ -1170,7 +1172,7 @@ func (p IPPrefix) Range() IPRange {
 	if p.IsZero() {
 		return IPRange{}
 	}
-	return IPRange{From: p.ip, To: p.lastIP()}
+	return IPRange{from: p.ip, to: p.lastIP()}
 }
 
 // IPNet returns the net.IPNet representation of an IPPrefix.
@@ -1336,20 +1338,30 @@ func (p IPPrefix) lastIP() IP {
 // IPRange represents an inclusive range of IP addresses
 // from the same address family.
 //
-// The From and To IPs are inclusive bounds, both included in the
+// The From() and To() IPs are inclusive bounds, both included in the
 // range.
 //
-// To be valid, the From and To values be non-zero, have matching
+// To be valid, the From() and To() values must be non-zero, have matching
 // address families (IPv4 vs IPv6), be in the same IPv6 zone (if any),
-// and From must be less than or equal to To.
+// and From() must be less than or equal to To().
 // An invalid range may be ignored.
 type IPRange struct {
-	// From is the initial IP address in the range.
-	From IP
+	// from is the initial IP address in the range.
+	from IP
 
-	// To is the final IP address in the range.
-	To IP
+	// to is the final IP address in the range.
+	to IP
 }
+
+// IPRangeFrom returns an IPRange from from to to.
+// It does not allocate.
+func IPRangeFrom(from, to IP) IPRange { return IPRange{from: from, to: to} }
+
+// From returns the lower bound of r.
+func (r IPRange) From() IP { return r.from }
+
+// To returns the upper bound of r.
+func (r IPRange) To() IP { return r.to }
 
 // ParseIPRange parses a range out of two IPs separated by a hyphen.
 //
@@ -1362,16 +1374,16 @@ func ParseIPRange(s string) (IPRange, error) {
 	}
 	from, to := s[:h], s[h+1:]
 	var err error
-	r.From, err = ParseIP(from)
+	r.from, err = ParseIP(from)
 	if err != nil {
 		return r, fmt.Errorf("invalid From IP %q in range %q", from, s)
 	}
-	r.To, err = ParseIP(to)
+	r.to, err = ParseIP(to)
 	if err != nil {
 		return r, fmt.Errorf("invalid To IP %q in range %q", to, s)
 	}
 	if !r.Valid() {
-		return r, fmt.Errorf("range %v to %v not valid", r.From, r.To)
+		return r, fmt.Errorf("range %v to %v not valid", r.from, r.to)
 	}
 	return r, nil
 }
@@ -1383,21 +1395,21 @@ func ParseIPRange(s string) (IPRange, error) {
 // ParseIPRange.
 func (r IPRange) String() string {
 	if r.Valid() {
-		return fmt.Sprintf("%s-%s", r.From, r.To)
+		return fmt.Sprintf("%s-%s", r.from, r.to)
 	}
-	if r.From.IsZero() || r.To.IsZero() {
+	if r.from.IsZero() || r.to.IsZero() {
 		return "zero IPRange"
 	}
 	return "invalid IPRange"
 }
 
-// Valid reports whether r.From and r.To are both non-zero and obey
+// Valid reports whether r.From() and r.To() are both non-zero and obey
 // the documented requirements: address families match, same IPv6
 // zone, and From is less than or equal to To.
 func (r IPRange) Valid() bool {
-	return !r.From.IsZero() &&
-		r.From.z == r.To.z &&
-		!r.To.Less(r.From)
+	return !r.from.IsZero() &&
+		r.from.z == r.to.z &&
+		!r.to.Less(r.from)
 }
 
 // Contains reports whether the range r includes addr.
@@ -1409,47 +1421,47 @@ func (r IPRange) Contains(addr IP) bool {
 
 // contains is like Contains, but without the validity check. For internal use.
 func (r IPRange) contains(addr IP) bool {
-	return r.From.Compare(addr) <= 0 && r.To.Compare(addr) >= 0
+	return r.from.Compare(addr) <= 0 && r.to.Compare(addr) >= 0
 }
 
-// less returns whether r is "before" other. It is before if r.From is
-// before other.From, or if they're equal, the shorter range is
+// less returns whether r is "before" other. It is before if r.From() is
+// before other.From(), or if they're equal, the shorter range is
 // before.
 func (r IPRange) less(other IPRange) bool {
-	if cmp := r.From.Compare(other.From); cmp != 0 {
+	if cmp := r.from.Compare(other.from); cmp != 0 {
 		return cmp < 0
 	}
-	return r.To.Less(other.To)
+	return r.to.Less(other.to)
 }
 
 // entirelyBefore returns whether r lies entirely before other in IP
 // space.
 func (r IPRange) entirelyBefore(other IPRange) bool {
-	return r.To.Less(other.From)
+	return r.to.Less(other.from)
 }
 
 // entirelyWithin returns whether r is entirely contained within
 // other.
 func (r IPRange) coveredBy(other IPRange) bool {
-	return other.From.lessOrEq(r.From) && r.To.lessOrEq(other.To)
+	return other.from.lessOrEq(r.from) && r.to.lessOrEq(other.to)
 }
 
 // inMiddleOf returns whether r is inside other, but not touching the
 // edges of other.
 func (r IPRange) inMiddleOf(other IPRange) bool {
-	return other.From.Less(r.From) && r.To.Less(other.To)
+	return other.from.Less(r.from) && r.to.Less(other.to)
 }
 
 // overlapsStartOf returns whether r entirely overlaps the start of
 // other, but not all of other.
 func (r IPRange) overlapsStartOf(other IPRange) bool {
-	return r.From.lessOrEq(other.From) && r.To.Less(other.To)
+	return r.from.lessOrEq(other.from) && r.to.Less(other.to)
 }
 
 // overlapsEndOf returns whether r entirely overlaps the end of
 // other, but not all of other.
 func (r IPRange) overlapsEndOf(other IPRange) bool {
-	return other.From.Less(r.From) && other.To.lessOrEq(r.To)
+	return other.from.Less(r.from) && other.to.lessOrEq(r.to)
 }
 
 // mergeIPRanges returns the minimum and sorted set of IP ranges that
@@ -1474,27 +1486,27 @@ func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
 			// Invalid ranges make no sense to merge, refuse to
 			// perform.
 			return nil, false
-		case prev.To.Next() == r.From:
+		case prev.to.Next() == r.from:
 			// prev and r touch, merge them.
 			//
 			//   prev     r
 			// f------tf-----t
-			prev.To = r.To
-		case prev.To.Less(r.From):
+			prev.to = r.to
+		case prev.to.Less(r.from):
 			// No overlap and not adjacent (per previous case), no
 			// merging possible.
 			//
 			//   prev       r
 			// f------t  f-----t
 			out = append(out, r)
-		case prev.To.Less(r.To):
+		case prev.to.Less(r.to):
 			// Partial overlap, update prev
 			//
 			//   prev
 			// f------t
 			//     f-----t
 			//        r
-			prev.To = r.To
+			prev.to = r.to
 		default:
 			// r entirely contained in prev, nothing to do.
 			//
@@ -1514,8 +1526,8 @@ func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
 func (r IPRange) Overlaps(o IPRange) bool {
 	return r.Valid() &&
 		o.Valid() &&
-		r.From.Compare(o.To) <= 0 &&
-		o.From.Compare(r.To) <= 0
+		r.from.Compare(o.to) <= 0 &&
+		o.from.Compare(r.to) <= 0
 }
 
 // prefixMaker returns a address-family-corrected IPPrefix from a and bits,
@@ -1539,12 +1551,12 @@ func (r IPRange) AppendPrefixes(dst []IPPrefix) []IPPrefix {
 	if !r.Valid() {
 		return nil
 	}
-	return appendRangePrefixes(dst, r.prefixFrom128AndBits, r.From.addr, r.To.addr)
+	return appendRangePrefixes(dst, r.prefixFrom128AndBits, r.from.addr, r.to.addr)
 }
 
 func (r IPRange) prefixFrom128AndBits(a uint128, bits uint8) IPPrefix {
-	ip := IP{addr: a, z: r.From.z}
-	if r.From.Is4() {
+	ip := IP{addr: a, z: r.from.z}
+	if r.from.Is4() {
 		bits -= 12 * 8
 	}
 	return IPPrefix{ip, bits}
@@ -1572,8 +1584,8 @@ func (r IPRange) Prefix() (p IPPrefix, ok bool) {
 	if !r.Valid() {
 		return
 	}
-	if common, ok := comparePrefixes(r.From.addr, r.To.addr); ok {
-		return r.prefixFrom128AndBits(r.From.addr, common), true
+	if common, ok := comparePrefixes(r.from.addr, r.to.addr); ok {
+		return r.prefixFrom128AndBits(r.from.addr, common), true
 	}
 	return
 }
