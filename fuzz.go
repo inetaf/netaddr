@@ -66,6 +66,36 @@ func Fuzz(b []byte) int {
 		panic(".Prior.Next did not round trip")
 	}
 
+	{
+		buf, err := ip.MarshalText()
+		if err != nil {
+			panic(err)
+		}
+		var ip2 IP
+		err = ip2.UnmarshalText(buf)
+		if err != nil {
+			panic(err)
+		}
+		if ip != ip2 {
+			panic(err)
+		}
+	}
+
+	{
+		buf, err := ip.MarshalBinary()
+		if err != nil {
+			panic(err)
+		}
+		var ip2 IP
+		err = ip2.UnmarshalBinary(buf)
+		if err != nil {
+			panic(err)
+		}
+		if ip != ip2 {
+			panic(fmt.Sprintf("IP MarshalBinary round trip failed: %v != %v", ip, ip2))
+		}
+	}
+
 	port, err := ParseIPPort(s)
 	if err == nil {
 		s2 := port.String()
@@ -78,6 +108,19 @@ func Fuzz(b []byte) int {
 		}
 		if port2.String() != s2 {
 			panic("IPPort String round trip identity failure")
+		}
+
+		buf, err := port.MarshalText()
+		if err != nil {
+			panic(err)
+		}
+		port2 = IPPort{}
+		err = port2.UnmarshalText(buf)
+		if err != nil {
+			panic(err)
+		}
+		if port != port2 {
+			panic(err)
 		}
 	}
 
@@ -94,6 +137,19 @@ func Fuzz(b []byte) int {
 		}
 		if ipp2.String() != s2 {
 			panic("IPPrefix String round trip identity failure")
+		}
+
+		buf, err := ipp.MarshalText()
+		if err != nil {
+			panic(err)
+		}
+		ipp2 = IPPrefix{}
+		err = ipp2.UnmarshalText(buf)
+		if err != nil {
+			panic(err)
+		}
+		if ipp != ipp2 {
+			panic(err)
 		}
 	}
 
