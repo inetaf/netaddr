@@ -831,16 +831,20 @@ func (ip *IP) UnmarshalText(text []byte) error {
 
 // MarshalBinary implements the encoding.BinaryMarshaler interface.
 func (ip IP) MarshalBinary() ([]byte, error) {
-	if ip.Is4() {
+	switch ip.z {
+	case z0:
+		return nil, nil
+	case z4:
 		b := ip.As4()
 		return b[:], nil
+	default:
+		b16 := ip.As16()
+		b := b16[:]
+		if z := ip.Zone(); z != "" {
+			b = append(b, []byte(z)...)
+		}
+		return b, nil
 	}
-	b16 := ip.As16()
-	b := b16[:]
-	if z := ip.Zone(); z != "" {
-		b = append(b, []byte(z)...)
-	}
-	return b, nil
 }
 
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.

@@ -330,19 +330,23 @@ func TestIPMarshalUnmarshalBinary(t *testing.T) {
 		ip       string
 		wantSize int
 	}{
+		{"", 0}, // zero IP
 		{"1.2.3.4", 4},
 		{"fd7a:115c:a1e0:ab12:4843:cd96:626b:430b", 16},
 		{"::ffff:c000:0280", 16},
 		{"::ffff:c000:0280%eth0", 20},
 	}
 	for _, tc := range tests {
-		ip := mustIP(tc.ip)
+		var ip IP
+		if len(tc.ip) > 0 {
+			ip = mustIP(tc.ip)
+		}
 		b, err := ip.MarshalBinary()
 		if err != nil {
 			t.Fatal(err)
 		}
 		if len(b) != tc.wantSize {
-			t.Fatalf("ipv4 got %d; want %d", len(b), tc.wantSize)
+			t.Fatalf("%q encoded to size %d; want %d", tc.ip, len(b), tc.wantSize)
 		}
 		var ip2 IP
 		if err := ip2.UnmarshalBinary(b); err != nil {
