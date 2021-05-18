@@ -7,6 +7,8 @@
 package netaddr
 
 import (
+	"bytes"
+	"encoding"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -194,6 +196,9 @@ func TestParseIP(t *testing.T) {
 			if s != wants {
 				t.Errorf("ParseIP(%q).String() got %q, want %q", test.in, s, wants)
 			}
+
+			// Check that AppendTo matches MarshalText.
+			testAppendToMarshal(t, got)
 
 			// Check that MarshalText/UnmarshalText work similarly to
 			// ParseIP/String (see TestIPMarshalUnmarshal for
@@ -1330,6 +1335,8 @@ func TestIPPrefix(t *testing.T) {
 			if got := prefix.String(); got != test.prefix {
 				t.Errorf("prefix.String()=%q, want %q", got, test.prefix)
 			}
+
+			testAppendToMarshal(t, prefix)
 		})
 	}
 }
@@ -1580,7 +1587,14 @@ func TestParseIPPort(t *testing.T) {
 			}
 		})
 
-		// TextMarshal and TextUnmarhsal mostly behave like
+		t.Run(test.in+"/AppendTo", func(t *testing.T) {
+			got, err := ParseIPPort(test.in)
+			if err == nil {
+				testAppendToMarshal(t, got)
+			}
+		})
+
+		// TextMarshal and TextUnmarshal mostly behave like
 		// ParseIPPort and String. Divergent behavior are handled in
 		// TestIPPortMarshalUnmarshal.
 		t.Run(test.in+"/Marshal", func(t *testing.T) {
@@ -1633,7 +1647,29 @@ func TestIPPortMarshalUnmarshal(t *testing.T) {
 			if orig != back {
 				t.Errorf("Marshal = %q; want %q", back, orig)
 			}
+
+			testAppendToMarshal(t, ipp)
 		})
+	}
+}
+
+type appendMarshaller interface {
+	encoding.TextMarshaler
+	AppendTo([]byte) []byte
+}
+
+// testAppendToMarshal tests that x's AppendTo and MarshalText methods yield the same results.
+// x's MarshalText method must not return an error.
+func testAppendToMarshal(t *testing.T, x appendMarshaller) {
+	t.Helper()
+	m, err := x.MarshalText()
+	if err != nil {
+		t.Fatalf("(%v).MarshalText: %v", x, err)
+	}
+	a := make([]byte, 0, len(m))
+	a = x.AppendTo(a)
+	if !bytes.Equal(m, a) {
+		t.Errorf("(%v).MarshalText = %q, (%v).AppendTo = %q", x, m, x, a)
 	}
 }
 
