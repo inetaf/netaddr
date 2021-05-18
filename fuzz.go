@@ -7,6 +7,7 @@
 package netaddr
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"strings"
@@ -71,6 +72,11 @@ func Fuzz(b []byte) int {
 		if err != nil {
 			panic(err)
 		}
+		buf2 := make([]byte, 0, len(buf))
+		buf2 = ip.AppendTo(buf2)
+		if !bytes.Equal(buf, buf2) {
+			panic("IP AppendTo != MarshalText")
+		}
 		var ip2 IP
 		err = ip2.UnmarshalText(buf)
 		if err != nil {
@@ -114,6 +120,11 @@ func Fuzz(b []byte) int {
 		if err != nil {
 			panic(err)
 		}
+		buf2 := make([]byte, 0, len(buf))
+		buf2 = port.AppendTo(buf2)
+		if !bytes.Equal(buf, buf2) {
+			panic("IPPort AppendTo != MarshalText")
+		}
 		port2 = IPPort{}
 		err = port2.UnmarshalText(buf)
 		if err != nil {
@@ -142,6 +153,11 @@ func Fuzz(b []byte) int {
 		buf, err := ipp.MarshalText()
 		if err != nil {
 			panic(err)
+		}
+		buf2 := make([]byte, 0, len(buf))
+		buf2 = ipp.AppendTo(buf2)
+		if !bytes.Equal(buf, buf2) {
+			panic("IPPrefix AppendTo != MarshalText")
 		}
 		ipp2 = IPPrefix{}
 		err = ipp2.UnmarshalText(buf)
