@@ -974,15 +974,20 @@ func MustParseIPPort(s string) IPPort {
 func (p IPPort) IsZero() bool { return p == IPPort{} }
 
 // Valid reports whether p.IP() is non-zero.
+// All ports are valid, including zero.
 func (p IPPort) Valid() bool { return !p.ip.IsZero() }
 
 func (p IPPort) String() string {
-	if p.ip.z == z4 {
+	switch p.ip.z {
+	case z0:
+		return "invalid IPPort"
+	case z4:
 		a := p.ip.As4()
 		return fmt.Sprintf("%d.%d.%d.%d:%d", a[0], a[1], a[2], a[3], p.port)
+	default:
+		// TODO: this could be more efficient allocation-wise:
+		return net.JoinHostPort(p.ip.String(), strconv.Itoa(int(p.port)))
 	}
-	// TODO: this could be more efficient allocation-wise:
-	return net.JoinHostPort(p.ip.String(), strconv.Itoa(int(p.port)))
 }
 
 // AppendTo appends a text encoding of p,
