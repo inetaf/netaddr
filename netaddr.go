@@ -973,6 +973,9 @@ func MustParseIPPort(s string) IPPort {
 // IsZero reports whether p is its zero value.
 func (p IPPort) IsZero() bool { return p == IPPort{} }
 
+// Valid reports whether p.IP() is non-zero.
+func (p IPPort) Valid() bool { return !p.ip.IsZero() }
+
 func (p IPPort) String() string {
 	if p.ip.z == z4 {
 		a := p.ip.As4()
