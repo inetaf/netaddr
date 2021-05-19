@@ -1296,7 +1296,7 @@ func (p IPPrefix) AppendTo(b []byte) []byte {
 		return b
 	}
 	if !p.Valid() {
-		return append(b, "invalid IP prefix"...)
+		return append(b, "invalid IPPrefix"...)
 	}
 
 	// p.IP is non-zero, because p is valid.
@@ -1348,7 +1348,7 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 // String returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
 	if !p.Valid() {
-		return "invalid IP prefix"
+		return "invalid IPPrefix"
 	}
 	return fmt.Sprintf("%s/%d", p.ip, p.bits)
 }
