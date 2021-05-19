@@ -1148,7 +1148,7 @@ func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
 //
 // Note that masked address bits are not zeroed. Use Masked for that.
 func ParseIPPrefix(s string) (IPPrefix, error) {
-	i := strings.IndexByte(s, '/')
+	i := strings.LastIndexByte(s, '/')
 	if i < 0 {
 		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): no '/'", s)
 	}

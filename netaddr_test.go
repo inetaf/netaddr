@@ -1305,6 +1305,17 @@ func TestIPPrefix(t *testing.T) {
 			contains:    mustIPs("2001:db8::1"),
 			notContains: mustIPs("fe80::1"),
 		},
+		{
+			prefix: "::%0/00/80",
+			ip:     mustIP("::%0/00"),
+			bits:   80,
+			ipNet: &net.IPNet{
+				IP:   net.ParseIP("::"), // net.IPNet drops zones
+				Mask: net.CIDRMask(80, 128),
+			},
+			contains:    mustIPs("::%0/00"),
+			notContains: mustIPs("ff::%0/00"),
+		},
 	}
 	for _, test := range tests {
 		t.Run(test.prefix, func(t *testing.T) {
