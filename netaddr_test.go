@@ -2726,3 +2726,20 @@ func TestNoAllocs(t *testing.T) {
 		sinkIPPrefix = panicPfxOK(a.Prefix())
 	})
 }
+
+func TestIPPrefixString(t *testing.T) {
+	tests := []struct {
+		ipp  IPPrefix
+		want string
+	}{
+		{IPPrefix{}, "invalid IPPrefix"},
+		{IPPrefixFrom(IP{}, 8), "invalid IPPrefix"},
+		{IPPrefixFrom(MustParseIP("1.2.3.4"), 88), "invalid IPPrefix"},
+	}
+
+	for _, tt := range tests {
+		if got := tt.ipp.String(); got != tt.want {
+			t.Errorf("(%#v).String() = %q want %q", tt.ipp, got, tt.want)
+		}
+	}
+}
