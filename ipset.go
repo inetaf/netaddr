@@ -218,8 +218,8 @@ func (s *IPSetBuilder) Complement() {
 	s.normalize()
 	s.out = s.in
 	s.in = []IPRange{
-		IPPrefix{ip: IPv4(0, 0, 0, 0), bits: 0}.Range(),
-		IPPrefix{ip: IPv6Unspecified(), bits: 0}.Range(),
+		IPPrefixFrom(IPv4(0, 0, 0, 0), 0).Range(),
+		IPPrefixFrom(IPv6Unspecified(), 0).Range(),
 	}
 }
 
@@ -356,12 +356,12 @@ func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, newSet *IPSet, ok bo
 	var bestFit IPPrefix
 	for _, r := range s.rr {
 		for _, prefix := range r.Prefixes() {
-			if prefix.bits > bitLen {
+			if prefix.Bits() > bitLen {
 				continue
 			}
-			if bestFit.ip.IsZero() || prefix.bits > bestFit.bits {
+			if bestFit.IP().IsZero() || prefix.Bits() > bestFit.Bits() {
 				bestFit = prefix
-				if bestFit.bits == bitLen {
+				if bestFit.Bits() == bitLen {
 					// exact match, done.
 					break
 				}
@@ -369,11 +369,11 @@ func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, newSet *IPSet, ok bo
 		}
 	}
 
-	if bestFit.ip.IsZero() {
+	if bestFit.IP().IsZero() {
 		return IPPrefix{}, s, false
 	}
 
-	prefix := IPPrefix{ip: bestFit.ip, bits: bitLen}
+	prefix := IPPrefixFrom(bestFit.IP(), bitLen)
 
 	var b IPSetBuilder
 	b.AddSet(s)

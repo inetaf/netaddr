@@ -1348,16 +1348,16 @@ func TestIPPrefixValid(t *testing.T) {
 		ipp  IPPrefix
 		want bool
 	}{
-		{IPPrefix{v4, 0}, true},
-		{IPPrefix{v4, 32}, true},
-		{IPPrefix{v4, 33}, false},
-		{IPPrefix{v6, 0}, true},
-		{IPPrefix{v6, 32}, true},
-		{IPPrefix{v6, 128}, true},
-		{IPPrefix{v6, 129}, false},
-		{IPPrefix{IP{}, 0}, false},
-		{IPPrefix{IP{}, 32}, false},
-		{IPPrefix{IP{}, 128}, false},
+		{IPPrefixFrom(v4, 0), true},
+		{IPPrefixFrom(v4, 32), true},
+		{IPPrefixFrom(v4, 33), false},
+		{IPPrefixFrom(v6, 0), true},
+		{IPPrefixFrom(v6, 32), true},
+		{IPPrefixFrom(v6, 128), true},
+		{IPPrefixFrom(v6, 129), false},
+		{IPPrefixFrom(IP{}, 0), false},
+		{IPPrefixFrom(IP{}, 32), false},
+		{IPPrefixFrom(IP{}, 128), false},
 	}
 	for _, tt := range tests {
 		got := tt.ipp.Valid()
@@ -2521,11 +2521,11 @@ func TestIPPrefixContains(t *testing.T) {
 		{mustIPPrefix("::1/0"), IP{}, false},
 		{mustIPPrefix("1.2.3.4/0"), IP{}, false},
 		// invalid IPPrefix
-		{IPPrefix{mustIP("::1"), 129}, mustIP("::1"), false},
-		{IPPrefix{mustIP("1.2.3.4"), 33}, mustIP("1.2.3.4"), false},
-		{IPPrefix{IP{}, 0}, mustIP("1.2.3.4"), false},
-		{IPPrefix{IP{}, 32}, mustIP("1.2.3.4"), false},
-		{IPPrefix{IP{}, 128}, mustIP("::1"), false},
+		{IPPrefixFrom(mustIP("::1"), 129), mustIP("::1"), false},
+		{IPPrefixFrom(mustIP("1.2.3.4"), 33), mustIP("1.2.3.4"), false},
+		{IPPrefixFrom(IP{}, 0), mustIP("1.2.3.4"), false},
+		{IPPrefixFrom(IP{}, 32), mustIP("1.2.3.4"), false},
+		{IPPrefixFrom(IP{}, 128), mustIP("::1"), false},
 		// wrong IP family
 		{mustIPPrefix("::1/0"), mustIP("1.2.3.4"), false},
 		{mustIPPrefix("1.2.3.4/0"), mustIP("::1"), false},
