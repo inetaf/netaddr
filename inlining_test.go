@@ -42,11 +42,14 @@ func TestInlining(t *testing.T) {
 		return nil
 	})
 	for _, want := range []string{
-		"(*IPSetBuilder).Add",
 		"(*IPSetBuilder).Clone",
 		"(*IPSetBuilder).IPSet",
-		"(*IPSetBuilder).Remove",
-		"(*IPSetBuilder).RemoveRange",
+		"(*IPSetBuilder).MustAdd",
+		"(*IPSetBuilder).MustAddPrefix",
+		"(*IPSetBuilder).MustAddRange",
+		"(*IPSetBuilder).MustRemove",
+		"(*IPSetBuilder).MustRemovePrefix",
+		"(*IPSetBuilder).MustRemoveRange",
 		"(*IPSet).Ranges",
 		"(*uint128).halves",
 		"IP.BitLen",

@@ -24,9 +24,9 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "mix_family",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.AddPrefix(mustIPPrefix("::/0"))
-				s.RemovePrefix(mustIPPrefix("10.2.0.0/16"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("::/0"))
+				s.MustRemovePrefix(mustIPPrefix("10.2.0.0/16"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.1.255.255")},
@@ -37,8 +37,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "merge_adjacent",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.AddPrefix(mustIPPrefix("11.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("11.0.0.0/8"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("11.255.255.255")},
@@ -48,8 +48,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "remove_32",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustRemovePrefix(mustIPPrefix("10.1.2.3/32"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.1.2.2")},
@@ -85,9 +85,9 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "remove_32_and_first_16",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
-				s.RemovePrefix(mustIPPrefix("10.0.0.0/16"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustRemovePrefix(mustIPPrefix("10.1.2.3/32"))
+				s.MustRemovePrefix(mustIPPrefix("10.0.0.0/16"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.1.0.0"), mustIP("10.1.2.2")},
@@ -122,8 +122,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "add_dup",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
@@ -132,8 +132,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "add_dup_subet",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.AddPrefix(mustIPPrefix("10.0.0.0/16"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/16"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
@@ -142,9 +142,9 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "add_remove_add",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-				s.RemovePrefix(mustIPPrefix("10.1.2.3/32"))
-				s.AddPrefix(mustIPPrefix("10.1.0.0/16")) // undoes prior line
+				s.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+				s.MustRemovePrefix(mustIPPrefix("10.1.2.3/32"))
+				s.MustAddPrefix(mustIPPrefix("10.1.0.0/16")) // undoes prior line
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.255.255.255")},
@@ -153,8 +153,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "remove_then_add",
 			f: func(s *IPSetBuilder) {
-				s.RemovePrefix(mustIPPrefix("1.2.3.4/32")) // no-op
-				s.AddPrefix(mustIPPrefix("1.2.3.4/32"))
+				s.MustRemovePrefix(mustIPPrefix("1.2.3.4/32")) // no-op
+				s.MustAddPrefix(mustIPPrefix("1.2.3.4/32"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("1.2.3.4"), mustIP("1.2.3.4")},
@@ -163,8 +163,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "remove_end_on_add_start",
 			f: func(s *IPSetBuilder) {
-				s.AddRange(IPRange{mustIP("0.0.0.38"), mustIP("0.0.0.177")})
-				s.RemoveRange(IPRange{mustIP("0.0.0.18"), mustIP("0.0.0.38")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.38"), mustIP("0.0.0.177")})
+				s.MustRemoveRange(IPRange{mustIP("0.0.0.18"), mustIP("0.0.0.38")})
 			},
 			wantRanges: []IPRange{
 				{mustIP("0.0.0.39"), mustIP("0.0.0.177")},
@@ -173,17 +173,17 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "fuzz_fail_2",
 			f: func(s *IPSetBuilder) {
-				s.AddRange(IPRange{mustIP("0.0.0.143"), mustIP("0.0.0.185")})
-				s.AddRange(IPRange{mustIP("0.0.0.84"), mustIP("0.0.0.174")})
-				s.AddRange(IPRange{mustIP("0.0.0.51"), mustIP("0.0.0.61")})
-				s.RemoveRange(IPRange{mustIP("0.0.0.66"), mustIP("0.0.0.146")})
-				s.AddRange(IPRange{mustIP("0.0.0.22"), mustIP("0.0.0.207")})
-				s.RemoveRange(IPRange{mustIP("0.0.0.198"), mustIP("0.0.0.203")})
-				s.RemoveRange(IPRange{mustIP("0.0.0.23"), mustIP("0.0.0.69")})
-				s.AddRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.105")})
-				s.AddRange(IPRange{mustIP("0.0.0.151"), mustIP("0.0.0.203")})
-				s.AddRange(IPRange{mustIP("0.0.0.138"), mustIP("0.0.0.160")})
-				s.RemoveRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.161")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.143"), mustIP("0.0.0.185")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.84"), mustIP("0.0.0.174")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.51"), mustIP("0.0.0.61")})
+				s.MustRemoveRange(IPRange{mustIP("0.0.0.66"), mustIP("0.0.0.146")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.22"), mustIP("0.0.0.207")})
+				s.MustRemoveRange(IPRange{mustIP("0.0.0.198"), mustIP("0.0.0.203")})
+				s.MustRemoveRange(IPRange{mustIP("0.0.0.23"), mustIP("0.0.0.69")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.105")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.151"), mustIP("0.0.0.203")})
+				s.MustAddRange(IPRange{mustIP("0.0.0.138"), mustIP("0.0.0.160")})
+				s.MustRemoveRange(IPRange{mustIP("0.0.0.64"), mustIP("0.0.0.161")})
 			},
 			wantRanges: []IPRange{
 				{mustIP("0.0.0.22"), mustIP("0.0.0.22")},
@@ -196,13 +196,13 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "single_ips",
 			f: func(s *IPSetBuilder) {
-				s.Add(mustIP("10.0.0.0"))
-				s.Add(mustIP("10.0.0.1"))
-				s.Add(mustIP("10.0.0.2"))
-				s.Add(mustIP("10.0.0.3"))
-				s.Add(mustIP("10.0.0.4"))
-				s.Remove(mustIP("10.0.0.4"))
-				s.Add(mustIP("10.0.0.255"))
+				s.MustAdd(mustIP("10.0.0.0"))
+				s.MustAdd(mustIP("10.0.0.1"))
+				s.MustAdd(mustIP("10.0.0.2"))
+				s.MustAdd(mustIP("10.0.0.3"))
+				s.MustAdd(mustIP("10.0.0.4"))
+				s.MustRemove(mustIP("10.0.0.4"))
+				s.MustAdd(mustIP("10.0.0.255"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.0.0.3")},
@@ -214,12 +214,12 @@ func TestIPSet(t *testing.T) {
 			// regression test for a bug where Ranges returned invalid IPRanges.
 			name: "single_ip_removal",
 			f: func(s *IPSetBuilder) {
-				s.Add(mustIP("10.0.0.0"))
-				s.Add(mustIP("10.0.0.1"))
-				s.Add(mustIP("10.0.0.2"))
-				s.Add(mustIP("10.0.0.3"))
-				s.Add(mustIP("10.0.0.4"))
-				s.Remove(mustIP("10.0.0.4"))
+				s.MustAdd(mustIP("10.0.0.0"))
+				s.MustAdd(mustIP("10.0.0.1"))
+				s.MustAdd(mustIP("10.0.0.2"))
+				s.MustAdd(mustIP("10.0.0.3"))
+				s.MustAdd(mustIP("10.0.0.4"))
+				s.MustRemove(mustIP("10.0.0.4"))
 			},
 			wantRanges: []IPRange{
 				{mustIP("10.0.0.0"), mustIP("10.0.0.3")},
@@ -240,8 +240,8 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "invert_full",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(mustIPPrefix("0.0.0.0/0"))
-				s.AddPrefix(mustIPPrefix("::/0"))
+				s.MustAddPrefix(mustIPPrefix("0.0.0.0/0"))
+				s.MustAddPrefix(mustIPPrefix("::/0"))
 				s.Complement()
 			},
 			wantRanges:   []IPRange{},
@@ -250,10 +250,10 @@ func TestIPSet(t *testing.T) {
 		{
 			name: "invert_partial",
 			f: func(s *IPSetBuilder) {
-				s.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
-				s.Add(mustIP("3.3.3.3"))
-				s.AddPrefix(mustIPPrefix("4.4.4.0/24"))
-				s.Add(mustIP("1::1"))
+				s.MustAddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
+				s.MustAdd(mustIP("3.3.3.3"))
+				s.MustAddPrefix(mustIPPrefix("4.4.4.0/24"))
+				s.MustAdd(mustIP("1::1"))
 				s.Complement()
 			},
 			wantRanges: []IPRange{
@@ -269,9 +269,9 @@ func TestIPSet(t *testing.T) {
 			name: "intersect",
 			f: func(s *IPSetBuilder) {
 				var t IPSetBuilder
-				t.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("3.3.3.3")})
+				t.MustAddRange(IPRange{mustIP("2.2.2.2"), mustIP("3.3.3.3")})
 
-				s.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("4.4.4.4")})
+				s.MustAddRange(IPRange{mustIP("1.1.1.1"), mustIP("4.4.4.4")})
 				s.Intersect(t.IPSet())
 			},
 			wantRanges: []IPRange{
@@ -282,9 +282,9 @@ func TestIPSet(t *testing.T) {
 			name: "intersect_disjoint",
 			f: func(s *IPSetBuilder) {
 				var t IPSetBuilder
-				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
+				t.MustAddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
 
-				s.AddRange(IPRange{mustIP("3.3.3.3"), mustIP("4.4.4.4")})
+				s.MustAddRange(IPRange{mustIP("3.3.3.3"), mustIP("4.4.4.4")})
 				s.Intersect(t.IPSet())
 			},
 			wantRanges: []IPRange{},
@@ -293,9 +293,9 @@ func TestIPSet(t *testing.T) {
 			name: "intersect_partial",
 			f: func(s *IPSetBuilder) {
 				var t IPSetBuilder
-				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("3.3.3.3")})
+				t.MustAddRange(IPRange{mustIP("1.1.1.1"), mustIP("3.3.3.3")})
 
-				s.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("4.4.4.4")})
+				s.MustAddRange(IPRange{mustIP("2.2.2.2"), mustIP("4.4.4.4")})
 				s.Intersect(t.IPSet())
 			},
 			wantRanges: []IPRange{
@@ -373,7 +373,7 @@ func TestIPSetRemoveFreePrefix(t *testing.T) {
 		{
 			name: "cut in half",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(pfx("10.0.0.0/8"))
+				s.MustAddPrefix(pfx("10.0.0.0/8"))
 			},
 			b:            9,
 			wantPrefix:   pfx("10.0.0.0/9"),
@@ -383,8 +383,8 @@ func TestIPSetRemoveFreePrefix(t *testing.T) {
 		{
 			name: "on prefix left",
 			f: func(s *IPSetBuilder) {
-				s.AddPrefix(pfx("10.0.0.0/8"))
-				s.RemovePrefix(pfx("10.0.0.0/9"))
+				s.MustAddPrefix(pfx("10.0.0.0/8"))
+				s.MustRemovePrefix(pfx("10.0.0.0/9"))
 			},
 			b:            9,
 			wantPrefix:   pfx("10.128.0.0/9"),
@@ -422,9 +422,9 @@ func mustIPSet(ranges ...string) *IPSet {
 		}
 		switch r[0] {
 		case '+':
-			ret.AddRange(ipr)
+			ret.MustAddRange(ipr)
 		case '-':
-			ret.RemoveRange(ipr)
+			ret.MustRemoveRange(ipr)
 		default:
 			panic(fmt.Sprintf("unknown command %q", r[0]))
 		}
@@ -493,9 +493,9 @@ func TestIPSetOverlaps(t *testing.T) {
 
 func TestIPSetContains(t *testing.T) {
 	var build IPSetBuilder
-	build.AddPrefix(mustIPPrefix("10.0.0.0/8"))
-	build.AddPrefix(mustIPPrefix("1.2.3.4/32"))
-	build.AddPrefix(mustIPPrefix("fc00::/7"))
+	build.MustAddPrefix(mustIPPrefix("10.0.0.0/8"))
+	build.MustAddPrefix(mustIPPrefix("1.2.3.4/32"))
+	build.MustAddPrefix(mustIPPrefix("fc00::/7"))
 	s := build.IPSet()
 
 	tests := []struct {
@@ -575,11 +575,11 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 		switch op {
 		case 0:
 			steps = append(steps, fmt.Sprintf("add 0.0.0.%d-0.0.0.%d", ip1, ip2))
-			b.AddRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
+			b.MustAddRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
 			v = true
 		case 1:
 			steps = append(steps, fmt.Sprintf("remove 0.0.0.%d-0.0.0.%d", ip1, ip2))
-			b.RemoveRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
+			b.MustRemoveRange(IPRangeFrom(IPv4(0, 0, 0, ip1), IPv4(0, 0, 0, ip2)))
 		}
 		for i := ip1; i <= ip2; i++ {
 			wantContains[i] = v
@@ -610,7 +610,7 @@ func TestIPSetRanges(t *testing.T) {
 		ranges := make([]IPRange, 0)
 		flush := func() {
 			r := IPRangeFrom(from, to)
-			build.AddRange(r)
+			build.MustAddRange(r)
 			ranges = append(ranges, r)
 			from, to = IP{}, IP{}
 		}
@@ -664,7 +664,7 @@ func TestIPSetRangesStress(t *testing.T) {
 			for i := a; i <= b; i++ {
 				want[i] = true
 			}
-			build.AddRange(r)
+			build.MustAddRange(r)
 		}
 		// Remove some ranges
 		for i := 0; i < rand.Intn(3); i++ {
@@ -672,7 +672,7 @@ func TestIPSetRangesStress(t *testing.T) {
 			for i := a; i <= b; i++ {
 				want[i] = false
 			}
-			build.RemoveRange(r)
+			build.MustRemoveRange(r)
 		}
 		ranges := build.IPSet().Ranges()
 
@@ -691,7 +691,7 @@ func TestIPSetRangesStress(t *testing.T) {
 		// changes in the future to not use Ranges itself:
 		var build2 IPSetBuilder
 		for _, r := range ranges {
-			build2.AddRange(r)
+			build2.MustAddRange(r)
 		}
 		s2 := build2.IPSet()
 		for i, want := range want {
@@ -713,11 +713,11 @@ func TestIPSetEqual(t *testing.T) {
 		}
 	}
 
-	a.Add(MustParseIP("1.1.1.0"))
-	a.Add(MustParseIP("1.1.1.1"))
-	a.Add(MustParseIP("1.1.1.2"))
-	b.AddPrefix(MustParseIPPrefix("1.1.1.0/31"))
-	b.Add(MustParseIP("1.1.1.2"))
+	a.MustAdd(MustParseIP("1.1.1.0"))
+	a.MustAdd(MustParseIP("1.1.1.1"))
+	a.MustAdd(MustParseIP("1.1.1.2"))
+	b.MustAddPrefix(MustParseIPPrefix("1.1.1.0/31"))
+	b.MustAdd(MustParseIP("1.1.1.2"))
 	assertEqual(true)
 
 	a.RemoveSet(a.IPSet())
@@ -725,11 +725,45 @@ func TestIPSetEqual(t *testing.T) {
 	b.RemoveSet(b.IPSet())
 	assertEqual(true)
 
-	a.Add(MustParseIP("1.1.1.0"))
-	a.Add(MustParseIP("1.1.1.1"))
-	a.Add(MustParseIP("1.1.1.2"))
+	a.MustAdd(MustParseIP("1.1.1.0"))
+	a.MustAdd(MustParseIP("1.1.1.1"))
+	a.MustAdd(MustParseIP("1.1.1.2"))
 
-	b.AddPrefix(MustParseIPPrefix("1.1.1.0/30"))
-	b.Remove(MustParseIP("1.1.1.3"))
+	b.MustAddPrefix(MustParseIPPrefix("1.1.1.0/30"))
+	b.MustRemove(MustParseIP("1.1.1.3"))
 	assertEqual(true)
+}
+
+func TestIPSetInvalid(t *testing.T) {
+	var s IPSetBuilder
+	t.Run("ip", func(t *testing.T) {
+		if err := s.Add(IP{}); err == nil {
+			t.Fatal("was able to add zero IP")
+		}
+		if err := s.Remove(IP{}); err == nil {
+			t.Fatal("was able to remove zero IP")
+		}
+	})
+	t.Run("prefix", func(t *testing.T) {
+		if err := s.AddPrefix(IPPrefix{}); err == nil {
+			t.Fatal("was able to add zero IPPrefix")
+		}
+		if err := s.RemovePrefix(IPPrefix{}); err == nil {
+			t.Fatal("was able to remove zero IPPrefix")
+		}
+	})
+	t.Run("range", func(t *testing.T) {
+		if err := s.AddRange(IPRange{}); err == nil {
+			t.Fatal("was able to add zero IPRange")
+		}
+		if err := s.RemoveRange(IPRange{}); err == nil {
+			t.Fatal("was able to remove zero IPRange")
+		}
+		if err := s.AddRange(IPRangeFrom(MustParseIP("1.0.0.0"), MustParseIP("0.0.0.0"))); err == nil {
+			t.Fatal("was able to add invalid IPRange")
+		}
+		if err := s.RemoveRange(IPRangeFrom(MustParseIP("1.0.0.0"), MustParseIP("0.0.0.0"))); err == nil {
+			t.Fatal("was able to add invalid IPRange")
+		}
+	})
 }
