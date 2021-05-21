@@ -1465,14 +1465,14 @@ func (r IPRange) contains(addr IP) bool {
 	return r.from.Compare(addr) <= 0 && r.to.Compare(addr) >= 0
 }
 
-// less returns whether r is "before" other. It is before if r.From() is
-// before other.From(), or if they're equal, the shorter range is
-// before.
+// less reports whether r is "before" other. It is before if r.From()
+// is before other.From(). If they're equal, then the larger range
+// (higher To()) comes first.
 func (r IPRange) less(other IPRange) bool {
 	if cmp := r.from.Compare(other.from); cmp != 0 {
 		return cmp < 0
 	}
-	return r.to.Less(other.to)
+	return other.to.Less(r.to)
 }
 
 // entirelyBefore returns whether r lies entirely before other in IP
