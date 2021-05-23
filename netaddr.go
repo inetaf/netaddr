@@ -537,9 +537,13 @@ func (ip IP) WithZone(zone string) IP {
 // IsLinkLocalUnicast reports whether ip is a link-local unicast address.
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalUnicast() bool {
+	// Dynamic Configuration of IPv4 Link-Local Addresses
+	// https://datatracker.ietf.org/doc/html/rfc3927#section-2.1
 	if ip.Is4() {
 		return ip.v4(0) == 169 && ip.v4(1) == 254
 	}
+	// IP Version 6 Addressing Architecture (2.5.6 Link-Local IPv6 Unicast Addresses)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.5.6
 	if ip.Is6() {
 		return ip.v6u16(0) == 0xfe80
 	}
@@ -549,9 +553,13 @@ func (ip IP) IsLinkLocalUnicast() bool {
 // IsLoopback reports whether ip is a loopback address. If ip is the zero value,
 // it will return false.
 func (ip IP) IsLoopback() bool {
+	// Requirements for Internet Hosts -- Communication Layers (3.2.1.3 Addressing)
+	// https://datatracker.ietf.org/doc/html/rfc1122#section-3.2.1.3
 	if ip.Is4() {
 		return ip.v4(0) == 127
 	}
+	// IP Version 6 Addressing Architecture (2.5.3 The Loopback Address)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.5.3
 	if ip.Is6() {
 		return ip.addr.hi == 0 && ip.addr.lo == 1
 	}
@@ -561,6 +569,8 @@ func (ip IP) IsLoopback() bool {
 // IsMulticast reports whether ip is a multicast address. If ip is the zero
 // value, it will return false.
 func (ip IP) IsMulticast() bool {
+	// Host Extensions for IP Multicasting (4. HOST GROUP ADDRESSES)
+	// https://datatracker.ietf.org/doc/html/rfc1112#section-4
 	if ip.Is4() {
 		return ip.v4(0)&0xf0 == 0xe0
 	}
@@ -574,6 +584,8 @@ func (ip IP) IsMulticast() bool {
 // multicast address. If ip is the zero value or an IPv4 address, it will return
 // false.
 func (ip IP) IsInterfaceLocalMulticast() bool {
+	// IPv6 Addressing Architecture (2.7.1. Pre-Defined Multicast Addresses)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.7.1
 	if ip.Is6() {
 		return ip.v6u16(0)&0xff0f == 0xff01
 	}
@@ -583,9 +595,13 @@ func (ip IP) IsInterfaceLocalMulticast() bool {
 // IsLinkLocalMulticast reports whether ip is a link-local multicast address.
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalMulticast() bool {
+	// IPv4 Multicast Guidelines (4. Local Network Control Block (224.0.0/24))
+	// https://datatracker.ietf.org/doc/html/rfc5771#section-4
 	if ip.Is4() {
 		return ip.v4(0) == 224 && ip.v4(1) == 0 && ip.v4(2) == 0
 	}
+	// IPv6 Addressing Architecture (2.7.1. Pre-Defined Multicast Addresses)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.7.1
 	if ip.Is6() {
 		return ip.v6u16(0)&0xff0f == 0xff02
 	}
