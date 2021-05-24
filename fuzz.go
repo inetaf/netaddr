@@ -32,6 +32,23 @@ func Fuzz(b []byte) int {
 			fmt.Println("ip=", ip, "stdip=", stdip)
 			panic("net.IP.String() != IP.String()")
 		}
+
+		for _, tt := range []struct {
+			name        string
+			ipResult    bool
+			stdipResult bool
+		}{
+			{"IsInterfaceLocalMulticast", ip.IsInterfaceLocalMulticast(), stdip.IsInterfaceLocalMulticast()},
+			{"IsLinkLocalMulticast", ip.IsLinkLocalMulticast(), stdip.IsLinkLocalMulticast()},
+			{"IsLinkLocalUnicast", ip.IsLinkLocalUnicast(), stdip.IsLinkLocalUnicast()},
+			{"IsLoopback", ip.IsLoopback(), stdip.IsLoopback()},
+			{"IsMulticast", ip.IsMulticast(), stdip.IsMulticast()},
+		} {
+			if tt.ipResult != tt.stdipResult {
+				fmt.Printf("net.IP=%#v .%v=%v, netaddr.IP=%#v %v=%v\n", stdip, tt.name, tt.stdipResult, ip, tt.name, tt.ipResult)
+				panic(fmt.Sprintf(".%v() did not agree with stdlib", tt.name))
+			}
+		}
 	}
 	// Check that .Next().Prior() and .Prior().Next() preserve the IP.
 	if !ip.IsZero() && !ip.Next().IsZero() && ip.Next().Prior() != ip {
