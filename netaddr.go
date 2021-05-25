@@ -542,10 +542,10 @@ func (ip IP) IsLinkLocalUnicast() bool {
 	if ip.Is4() {
 		return ip.v4(0) == 169 && ip.v4(1) == 254
 	}
-	// IP Version 6 Addressing Architecture (2.5.6 Link-Local IPv6 Unicast Addresses)
-	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.5.6
+	// IP Version 6 Addressing Architecture (2.4 Address Type Identification)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.4
 	if ip.Is6() {
-		return ip.v6u16(0) == 0xfe80
+		return ip.v6u16(0)&0xffc0 == 0xfe80
 	}
 	return false // zero value
 }
@@ -558,8 +558,8 @@ func (ip IP) IsLoopback() bool {
 	if ip.Is4() {
 		return ip.v4(0) == 127
 	}
-	// IP Version 6 Addressing Architecture (2.5.3 The Loopback Address)
-	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.5.3
+	// IP Version 6 Addressing Architecture (2.4 Address Type Identification)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.4
 	if ip.Is6() {
 		return ip.addr.hi == 0 && ip.addr.lo == 1
 	}
@@ -574,6 +574,8 @@ func (ip IP) IsMulticast() bool {
 	if ip.Is4() {
 		return ip.v4(0)&0xf0 == 0xe0
 	}
+	// IP Version 6 Addressing Architecture (2.4 Address Type Identification)
+	// https://datatracker.ietf.org/doc/html/rfc4291#section-2.4
 	if ip.Is6() {
 		return ip.addr.hi>>(64-8) == 0xff // ip.v6(0) == 0xff
 	}

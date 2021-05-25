@@ -563,6 +563,7 @@ func TestIPProperties(t *testing.T) {
 
 		llu4     = mustIP("169.254.0.1")
 		llu6     = mustIP("fe80::1")
+		llu6Last = mustIP("febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff")
 		lluZone6 = mustIP("fe80::1%eth0")
 
 		loopback4 = mustIP("127.0.0.1")
@@ -623,6 +624,11 @@ func TestIPProperties(t *testing.T) {
 		{
 			name:             "link-local unicast v6Addr",
 			ip:               llu6,
+			linkLocalUnicast: true,
+		},
+		{
+			name:             "link-local unicast v6Addr upper bound",
+			ip:               llu6Last,
 			linkLocalUnicast: true,
 		},
 		{
