@@ -4,7 +4,12 @@
 
 package netaddr
 
-import "sort"
+import (
+	"errors"
+	"fmt"
+	"sort"
+	"strings"
+)
 
 // IPSetBuilder builds an immutable IPSet.
 //
@@ -20,6 +25,9 @@ type IPSetBuilder struct {
 
 	// out are the ranges to be removed from 'in'.
 	out []IPRange
+
+	// errs are errors accumulated during construction.
+	errs multiErr
 }
 
 // normalize normalizes s: s.in becomes the minimal sorted list of
@@ -158,15 +166,27 @@ func (s *IPSetBuilder) Clone() *IPSetBuilder {
 }
 
 // Add adds ip to s.
-func (s *IPSetBuilder) Add(ip IP) { s.AddRange(IPRangeFrom(ip, ip)) }
+func (s *IPSetBuilder) Add(ip IP) {
+	if ip.IsZero() {
+		return
+	}
+	s.AddRange(IPRangeFrom(ip, ip))
+}
 
 // AddPrefix adds all IPs in p to s.
-func (s *IPSetBuilder) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
+func (s *IPSetBuilder) AddPrefix(p IPPrefix) {
+	if r := p.Range(); r.Valid() {
+		s.AddRange(r)
+	} else {
+		s.errs = append(s.errs, fmt.Errorf("AddPrefix of invalid prefix %q", p))
+	}
+}
 
 // AddRange adds r to s.
 // If r is not Valid, AddRange does nothing.
 func (s *IPSetBuilder) AddRange(r IPRange) {
 	if !r.Valid() {
+		s.errs = append(s.errs, fmt.Errorf("AddRange of invalid range %q", r))
 		return
 	}
 	// If there are any removals (s.out), then we need to compact the set
@@ -179,26 +199,46 @@ func (s *IPSetBuilder) AddRange(r IPRange) {
 
 // AddSet adds all IPs in b to s.
 func (s *IPSetBuilder) AddSet(b *IPSet) {
+	if b == nil {
+		return
+	}
 	for _, r := range b.rr {
 		s.AddRange(r)
 	}
 }
 
 // Remove removes ip from s.
-func (s *IPSetBuilder) Remove(ip IP) { s.RemoveRange(IPRangeFrom(ip, ip)) }
+func (s *IPSetBuilder) Remove(ip IP) {
+	if ip.IsZero() {
+		s.errs = append(s.errs, errors.New("ignored Remove of zero IP"))
+	} else {
+		s.RemoveRange(IPRangeFrom(ip, ip))
+	}
+}
 
 // RemovePrefix removes all IPs in p from s.
-func (s *IPSetBuilder) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
+func (s *IPSetBuilder) RemovePrefix(p IPPrefix) {
+	if r := p.Range(); r.Valid() {
+		s.RemoveRange(r)
+	} else {
+		s.errs = append(s.errs, fmt.Errorf("RemovePrefix of invalid prefix %q", p))
+	}
+}
 
 // RemoveRange removes all IPs in r from s.
 func (s *IPSetBuilder) RemoveRange(r IPRange) {
 	if r.Valid() {
 		s.out = append(s.out, r)
+	} else {
+		s.errs = append(s.errs, fmt.Errorf("RemoveRange of invalid range %q", r))
 	}
 }
 
 // RemoveSet removes all IPs in o from s.
 func (s *IPSetBuilder) RemoveSet(b *IPSet) {
+	if b == nil {
+		return
+	}
 	for _, r := range b.rr {
 		s.RemoveRange(r)
 	}
@@ -237,11 +277,17 @@ func discardf(format string, args ...interface{}) {}
 var debugf = discardf
 
 // IPSet returns an immutable IPSet representing the current state of
-// s. The builder remains usable after calling IPSet.
-func (s *IPSetBuilder) IPSet() *IPSet {
+// s, along with any errors accumulated during the construction of s.
+// The builder remains usable after calling IPSet.
+func (s *IPSetBuilder) IPSet() (*IPSet, error) {
 	s.normalize()
-	return &IPSet{
+	ret := &IPSet{
 		rr: append([]IPRange{}, s.in...),
+	}
+	if len(s.errs) == 0 {
+		return ret, nil
+	} else {
+		return ret, s.errs
 	}
 }
 
@@ -378,5 +424,16 @@ func (s *IPSet) RemoveFreePrefix(bitLen uint8) (p IPPrefix, newSet *IPSet, ok bo
 	var b IPSetBuilder
 	b.AddSet(s)
 	b.RemovePrefix(prefix)
-	return prefix, b.IPSet(), true
+	newSet, _ = b.IPSet()
+	return prefix, newSet, true
+}
+
+type multiErr []error
+
+func (e multiErr) Error() string {
+	var ret []string
+	for _, err := range e {
+		ret = append(ret, err.Error())
+	}
+	return strings.Join(ret, ", ")
 }

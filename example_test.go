@@ -172,7 +172,7 @@ func ExampleIPSet() {
 		netaddr.MustParseIP("fed0::04ff"),
 	))
 
-	s := b.IPSet()
+	s, _ := b.IPSet()
 
 	fmt.Println("Ranges:")
 	for _, r := range s.Ranges() {
