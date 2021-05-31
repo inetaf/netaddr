@@ -13,6 +13,14 @@ import (
 	"testing"
 )
 
+func buildIPSet(b *IPSetBuilder) *IPSet {
+	ret, err := b.IPSet()
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
 func TestIPSet(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -272,7 +280,7 @@ func TestIPSet(t *testing.T) {
 				t.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("3.3.3.3")})
 
 				s.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("4.4.4.4")})
-				s.Intersect(t.IPSet())
+				s.Intersect(buildIPSet(&t))
 			},
 			wantRanges: []IPRange{
 				{mustIP("2.2.2.2"), mustIP("3.3.3.3")},
@@ -285,7 +293,7 @@ func TestIPSet(t *testing.T) {
 				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("2.2.2.2")})
 
 				s.AddRange(IPRange{mustIP("3.3.3.3"), mustIP("4.4.4.4")})
-				s.Intersect(t.IPSet())
+				s.Intersect(buildIPSet(&t))
 			},
 			wantRanges: []IPRange{},
 		},
@@ -296,7 +304,7 @@ func TestIPSet(t *testing.T) {
 				t.AddRange(IPRange{mustIP("1.1.1.1"), mustIP("3.3.3.3")})
 
 				s.AddRange(IPRange{mustIP("2.2.2.2"), mustIP("4.4.4.4")})
-				s.Intersect(t.IPSet())
+				s.Intersect(buildIPSet(&t))
 			},
 			wantRanges: []IPRange{
 				{mustIP("2.2.2.2"), mustIP("3.3.3.3")},
@@ -309,7 +317,7 @@ func TestIPSet(t *testing.T) {
 			defer func() { debugf = discardf }()
 			var build IPSetBuilder
 			tt.f(&build)
-			s := build.IPSet()
+			s := buildIPSet(&build)
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
 				for _, v := range got {
@@ -397,7 +405,7 @@ func TestIPSetRemoveFreePrefix(t *testing.T) {
 			debugf = t.Logf
 			var build IPSetBuilder
 			tt.f(&build)
-			s := build.IPSet()
+			s := buildIPSet(&build)
 			gotPrefix, gotSet, ok := s.RemoveFreePrefix(tt.b)
 			if ok != tt.wantOK {
 				t.Errorf("extractPrefix() ok = %t, wantOK %t", ok, tt.wantOK)
@@ -407,7 +415,7 @@ func TestIPSetRemoveFreePrefix(t *testing.T) {
 				t.Errorf("extractPrefix() = %v, want %v", gotPrefix, tt.wantPrefix)
 			}
 			if !reflect.DeepEqual(gotSet.Prefixes(), tt.wantPrefixes) {
-				t.Errorf("extractPrefix() = %v, want %v", build.IPSet().Prefixes(), tt.wantPrefixes)
+				t.Errorf("extractPrefix() = %v, want %v", gotSet.Prefixes(), tt.wantPrefixes)
 			}
 		})
 	}
@@ -429,7 +437,7 @@ func mustIPSet(ranges ...string) *IPSet {
 			panic(fmt.Sprintf("unknown command %q", r[0]))
 		}
 	}
-	return ret.IPSet()
+	return buildIPSet(&ret)
 }
 
 func TestIPSetOverlaps(t *testing.T) {
@@ -496,7 +504,7 @@ func TestIPSetContains(t *testing.T) {
 	build.AddPrefix(mustIPPrefix("10.0.0.0/8"))
 	build.AddPrefix(mustIPPrefix("1.2.3.4/32"))
 	build.AddPrefix(mustIPPrefix("fc00::/7"))
-	s := build.IPSet()
+	s := buildIPSet(&build)
 
 	tests := []struct {
 		ip   string
@@ -588,7 +596,7 @@ func newRandomIPSet() (steps []string, s *IPSet, wantContains [256]bool) {
 			}
 		}
 	}
-	s = b.IPSet()
+	s = buildIPSet(b)
 	return
 }
 
@@ -630,7 +638,7 @@ func TestIPSetRanges(t *testing.T) {
 		if !from.IsZero() {
 			flush()
 		}
-		got := build.IPSet().Ranges()
+		got := buildIPSet(&build).Ranges()
 		if !reflect.DeepEqual(got, ranges) {
 			t.Errorf("for %016b: got %v; want %v", pat, got, ranges)
 		}
@@ -674,7 +682,7 @@ func TestIPSetRangesStress(t *testing.T) {
 			}
 			build.RemoveRange(r)
 		}
-		ranges := build.IPSet().Ranges()
+		ranges := buildIPSet(&build).Ranges()
 
 		// Make sure no ranges are adjacent or overlapping
 		for i, r := range ranges {
@@ -693,7 +701,7 @@ func TestIPSetRangesStress(t *testing.T) {
 		for _, r := range ranges {
 			build2.AddRange(r)
 		}
-		s2 := build2.IPSet()
+		s2 := buildIPSet(&build2)
 		for i, want := range want {
 			if got := s2.Contains(IPv4(0, 0, uint8(i>>8), uint8(i))); got != want {
 				t.Fatal("failed")
@@ -708,7 +716,7 @@ func TestIPSetEqual(t *testing.T) {
 
 	assertEqual := func(want bool) {
 		t.Helper()
-		if got := a.IPSet().Equal(b.IPSet()); got != want {
+		if got := buildIPSet(a).Equal(buildIPSet(b)); got != want {
 			t.Errorf("%v.Equal(%v) = %v want %v", a, b, got, want)
 		}
 	}
@@ -720,9 +728,9 @@ func TestIPSetEqual(t *testing.T) {
 	b.Add(MustParseIP("1.1.1.2"))
 	assertEqual(true)
 
-	a.RemoveSet(a.IPSet())
+	a.RemoveSet(buildIPSet(a))
 	assertEqual(false)
-	b.RemoveSet(b.IPSet())
+	b.RemoveSet(buildIPSet(b))
 	assertEqual(true)
 
 	a.Add(MustParseIP("1.1.1.0"))
