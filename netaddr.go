@@ -541,6 +541,16 @@ func (ip IP) WithZone(zone string) IP {
 	return ip
 }
 
+// noZone unconditionally strips the zone from IP.
+// It's similar to WithZone, but small enough to be inlinable.
+func (ip IP) withoutZone() IP {
+	if !ip.Is6() {
+		return ip
+	}
+	ip.z = z6noz
+	return ip
+}
+
 // IsLinkLocalUnicast reports whether ip is a link-local unicast address.
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalUnicast() bool {
@@ -1165,7 +1175,7 @@ type IPPrefix struct {
 // It does not allocate.
 func IPPrefixFrom(ip IP, bits uint8) IPPrefix {
 	return IPPrefix{
-		ip:   ip.WithZone(""),
+		ip:   ip.withoutZone(),
 		bits: bits,
 	}
 }
@@ -1267,7 +1277,7 @@ func (p IPPrefix) Range() IPRange {
 	if p.IsZero() {
 		return IPRange{}
 	}
-	return IPRange{from: p.ip, to: p.lastIP()}
+	return IPRangeFrom(p.ip, p.lastIP())
 }
 
 // IPNet returns the net.IPNet representation of an IPPrefix.
@@ -1450,8 +1460,8 @@ func (p IPPrefix) lastIP() IP {
 // range.
 //
 // To be valid, the From() and To() values must be non-zero, have matching
-// address families (IPv4 vs IPv6), be in the same IPv6 zone (if any),
-// and From() must be less than or equal to To().
+// address families (IPv4 vs IPv6), and From() must be less than or equal to To().
+// IPv6 zones are stripped out and ignored.
 // An invalid range may be ignored.
 type IPRange struct {
 	// from is the initial IP address in the range.
@@ -1463,7 +1473,12 @@ type IPRange struct {
 
 // IPRangeFrom returns an IPRange from from to to.
 // It does not allocate.
-func IPRangeFrom(from, to IP) IPRange { return IPRange{from: from, to: to} }
+func IPRangeFrom(from, to IP) IPRange {
+	return IPRange{
+		from: from.withoutZone(),
+		to:   to.withoutZone(),
+	}
+}
 
 // From returns the lower bound of r.
 func (r IPRange) From() IP { return r.from }
@@ -1486,10 +1501,12 @@ func ParseIPRange(s string) (IPRange, error) {
 	if err != nil {
 		return r, fmt.Errorf("invalid From IP %q in range %q", from, s)
 	}
+	r.from = r.from.withoutZone()
 	r.to, err = ParseIP(to)
 	if err != nil {
 		return r, fmt.Errorf("invalid To IP %q in range %q", to, s)
 	}
+	r.to = r.to.withoutZone()
 	if !r.Valid() {
 		return r, fmt.Errorf("range %v to %v not valid", r.from, r.to)
 	}
@@ -1511,9 +1528,9 @@ func (r IPRange) String() string {
 	return "invalid IPRange"
 }
 
-// Valid reports whether r.From() and r.To() are both non-zero and obey
-// the documented requirements: address families match, same IPv6
-// zone, and From is less than or equal to To.
+// Valid reports whether r.From() and r.To() are both non-zero and
+// obey the documented requirements: address families match, and From
+// is less than or equal to To.
 func (r IPRange) Valid() bool {
 	return !r.from.IsZero() &&
 		r.from.z == r.to.z &&
@@ -1524,10 +1541,11 @@ func (r IPRange) Valid() bool {
 //
 // An invalid range always reports false.
 func (r IPRange) Contains(addr IP) bool {
-	return r.Valid() && r.contains(addr)
+	return r.Valid() && r.contains(addr.withoutZone())
 }
 
-// contains is like Contains, but without the validity check. For internal use.
+// contains is like Contains, but without the validity check.
+// addr must not have a zone.
 func (r IPRange) contains(addr IP) bool {
 	return r.from.Compare(addr) <= 0 && r.to.Compare(addr) >= 0
 }
