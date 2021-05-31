@@ -703,6 +703,38 @@ func (ip IP) As4() [4]byte {
 	panic("As4 called on IPv6 address")
 }
 
+// Next returns the IP following ip.
+// If there is none, it returns the IP zero value.
+func (ip IP) Next() IP {
+	ip.addr = ip.addr.addOne()
+	if ip.Is4() {
+		if uint32(ip.addr.lo) == 0 {
+			// Overflowed.
+			return IP{}
+		}
+	} else {
+		if ip.addr.isZero() {
+			// Overflowed
+			return IP{}
+		}
+	}
+	return ip
+}
+
+// Prior returns the IP before ip.
+// If there is none, it returns the IP zero value.
+func (ip IP) Prior() IP {
+	if ip.Is4() {
+		if uint32(ip.addr.lo) == 0 {
+			return IP{}
+		}
+	} else if ip.addr.isZero() {
+		return IP{}
+	}
+	ip.addr = ip.addr.subOne()
+	return ip
+}
+
 // String returns the string form of the IP address ip.
 // It returns one of 4 forms:
 //
@@ -1727,36 +1759,4 @@ func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) [
 	dst = appendRangePrefixes(dst, makePrefix, a, a.bitsSetFrom(common+1))
 	dst = appendRangePrefixes(dst, makePrefix, b.bitsClearedFrom(common+1), b)
 	return dst
-}
-
-// Next returns the IP following ip.
-// If there is none, it returns the IP zero value.
-func (ip IP) Next() IP {
-	ip.addr = ip.addr.addOne()
-	if ip.Is4() {
-		if uint32(ip.addr.lo) == 0 {
-			// Overflowed.
-			return IP{}
-		}
-	} else {
-		if ip.addr.isZero() {
-			// Overflowed
-			return IP{}
-		}
-	}
-	return ip
-}
-
-// Prior returns the IP before ip.
-// If there is none, it returns the IP zero value.
-func (ip IP) Prior() IP {
-	if ip.Is4() {
-		if uint32(ip.addr.lo) == 0 {
-			return IP{}
-		}
-	} else if ip.addr.isZero() {
-		return IP{}
-	}
-	ip.addr = ip.addr.subOne()
-	return ip
 }
