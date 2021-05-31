@@ -158,7 +158,7 @@ func (s *IPSetBuilder) Clone() *IPSetBuilder {
 }
 
 // Add adds ip to s.
-func (s *IPSetBuilder) Add(ip IP) { s.AddRange(IPRange{ip, ip}) }
+func (s *IPSetBuilder) Add(ip IP) { s.AddRange(IPRangeFrom(ip, ip)) }
 
 // AddPrefix adds all IPs in p to s.
 func (s *IPSetBuilder) AddPrefix(p IPPrefix) { s.AddRange(p.Range()) }
@@ -185,7 +185,7 @@ func (s *IPSetBuilder) AddSet(b *IPSet) {
 }
 
 // Remove removes ip from s.
-func (s *IPSetBuilder) Remove(ip IP) { s.RemoveRange(IPRange{ip, ip}) }
+func (s *IPSetBuilder) Remove(ip IP) { s.RemoveRange(IPRangeFrom(ip, ip)) }
 
 // RemovePrefix removes all IPs in p from s.
 func (s *IPSetBuilder) RemovePrefix(p IPPrefix) { s.RemoveRange(p.Range()) }
@@ -300,7 +300,7 @@ func (s *IPSet) Contains(ip IP) bool {
 		return false
 	}
 	i--
-	return s.rr[i].contains(ip)
+	return s.rr[i].contains(ip.withoutZone())
 }
 
 // ContainsRange reports whether all IPs in r are in s.
