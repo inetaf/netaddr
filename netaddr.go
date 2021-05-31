@@ -393,6 +393,8 @@ func (ip IP) v6(i uint8) uint8 {
 	return uint8(*(ip.addr.halves()[(i/8)%2]) >> ((7 - i%8) * 8))
 }
 
+// v6u16 returns the i'th 16-bit word of ip. If ip is an IPv4 address,
+// this accesses the IPv4-mapped IPv6 address form of the IP.
 func (ip IP) v6u16(i uint8) uint16 {
 	return uint16(*(ip.addr.halves()[(i/4)%2]) >> ((3 - i%4) * 16))
 }
