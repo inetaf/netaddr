@@ -1156,7 +1156,7 @@ func (p IPPort) TCPAddr() *net.TCPAddr {
 
 // IPPrefix is an IP address prefix (CIDR) representing an IP network.
 //
-// The first Bits() of IP are specified. The remaining bits match any address.
+// The first Bits() of IP() are specified. The remaining bits match any address.
 // The range of Bits() is [0,32] for IPv4 or [0,128] for IPv6.
 type IPPrefix struct {
 	ip   IP
