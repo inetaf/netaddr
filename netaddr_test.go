@@ -1128,7 +1128,6 @@ func TestIPPrefixMarshalUnmarshal(t *testing.T) {
 		"0.0.0.0/0",
 		"::/0",
 		"::1/128",
-		"fe80::1cc0:3e8c:119f:c2e1%ens18/128",
 		"::ffff:c000:1234/128",
 		"2001:db8::/32",
 	}
@@ -1154,6 +1153,26 @@ func TestIPPrefixMarshalUnmarshal(t *testing.T) {
 				t.Errorf("Marshal = %q; want %q", back, orig)
 			}
 		})
+	}
+}
+
+func TestIPPrefixMarshalUnmarshalZone(t *testing.T) {
+	orig := `"fe80::1cc0:3e8c:119f:c2e1%ens18/128"`
+	unzoned := `"fe80::1cc0:3e8c:119f:c2e1/128"`
+
+	var p IPPrefix
+	if err := json.Unmarshal([]byte(orig), &p); err != nil {
+		t.Fatalf("failed to unmarshal: %v", err)
+	}
+
+	pb, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("failed to marshal: %v", err)
+	}
+
+	back := string(pb)
+	if back != unzoned {
+		t.Errorf("Marshal = %q; want %q", back, unzoned)
 	}
 }
 
@@ -1260,6 +1279,7 @@ func TestIPPrefix(t *testing.T) {
 		ip          IP
 		bits        uint8
 		ipNet       *net.IPNet
+		str         string
 		contains    []IP
 		notContains []IP
 	}{
@@ -1342,14 +1362,15 @@ func TestIPPrefix(t *testing.T) {
 		},
 		{
 			prefix: "::%0/00/80",
-			ip:     mustIP("::%0/00"),
+			ip:     mustIP("::"),
 			bits:   80,
+			str:    "::/80",
 			ipNet: &net.IPNet{
 				IP:   net.ParseIP("::"), // net.IPNet drops zones
 				Mask: net.CIDRMask(80, 128),
 			},
-			contains:    mustIPs("::%0/00"),
-			notContains: mustIPs("ff::%0/00"),
+			contains:    mustIPs("::%0/00", "::%1/23"),
+			notContains: mustIPs("ff::%0/00", "ff::%1/23"),
 		},
 	}
 	for _, test := range tests {
@@ -1378,8 +1399,12 @@ func TestIPPrefix(t *testing.T) {
 					t.Errorf("contains %s", ip)
 				}
 			}
-			if got := prefix.String(); got != test.prefix {
-				t.Errorf("prefix.String()=%q, want %q", got, test.prefix)
+			want := test.str
+			if want == "" {
+				want = test.prefix
+			}
+			if got := prefix.String(); got != want {
+				t.Errorf("prefix.String()=%q, want %q", got, want)
 			}
 
 			testAppendToMarshal(t, prefix)

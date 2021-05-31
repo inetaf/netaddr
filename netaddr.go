@@ -1237,10 +1237,7 @@ func ParseIPPrefix(s string) (IPPrefix, error) {
 	if bits < 0 || bits > maxBits {
 		return IPPrefix{}, fmt.Errorf("netaddr.ParseIPPrefix(%q): prefix length out of range", s)
 	}
-	return IPPrefix{
-		ip:   ip,
-		bits: uint8(bits),
-	}, nil
+	return IPPrefixFrom(ip, uint8(bits)), nil
 }
 
 // MustParseIPPrefix calls ParseIPPrefix(s) and panics on error.
@@ -1292,6 +1289,7 @@ func (p IPPrefix) IPNet() *net.IPNet {
 // An IPv4 address will not match an IPv6 prefix.
 // A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
+// ip's zone, if any, is ignored.
 func (p IPPrefix) Contains(ip IP) bool {
 	if !p.Valid() {
 		return false
