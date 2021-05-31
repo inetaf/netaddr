@@ -637,7 +637,7 @@ func (ip IP) Prefix(bits uint8) (IPPrefix, error) {
 		}
 	}
 	ip.addr = ip.addr.and(mask6[effectiveBits])
-	return IPPrefix{ip, bits}, nil
+	return IPPrefixFrom(ip, bits), nil
 }
 
 // Netmask applies a bit mask to IP, producing an IPPrefix. If IP is the
@@ -1165,7 +1165,12 @@ type IPPrefix struct {
 
 // IPPrefixFrom returns an IPPrefix with IP ip and port port.
 // It does not allocate.
-func IPPrefixFrom(ip IP, bits uint8) IPPrefix { return IPPrefix{ip: ip, bits: bits} }
+func IPPrefixFrom(ip IP, bits uint8) IPPrefix {
+	return IPPrefix{
+		ip:   ip.WithZone(""),
+		bits: bits,
+	}
+}
 
 // IP returns p's IP.
 func (p IPPrefix) IP() IP { return p.ip }
