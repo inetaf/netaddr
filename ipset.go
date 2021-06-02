@@ -19,6 +19,9 @@ import (
 // Removals only affect the current membership of the set, so in
 // general Adds should be called first. Input ranges may overlap in
 // any way.
+//
+// Most IPSetBuilder methods do not return errors.
+// Instead, errors are accumulated and reported by IPSetBuilder.IPSet.
 type IPSetBuilder struct {
 	// in are the ranges in the set.
 	in []IPRange
