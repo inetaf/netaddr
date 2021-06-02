@@ -821,7 +821,7 @@ func (ip IP) Prior() IP {
 func (ip IP) String() string {
 	switch ip.z {
 	case z0:
-		return "invalid IP"
+		return "zero IP"
 	case z4:
 		return ip.string4()
 	default:
