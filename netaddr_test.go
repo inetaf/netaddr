@@ -861,7 +861,7 @@ func TestLessCompare(t *testing.T) {
 	}
 	sort.Slice(values, func(i, j int) bool { return values[i].Less(values[j]) })
 	got := fmt.Sprintf("%s", values)
-	want := `[invalid IP 1.2.3.4 8.8.8.8 ::1 ::1%foo ::2]`
+	want := `[zero IP 1.2.3.4 8.8.8.8 ::1 ::1%foo ::2]`
 	if got != want {
 		t.Errorf("unexpected sort\n got: %s\nwant: %s\n", got, want)
 	}
@@ -874,7 +874,7 @@ func TestIPStringExpanded(t *testing.T) {
 	}{
 		{
 			ip: IP{},
-			s:  "invalid IP",
+			s:  "zero IP",
 		},
 		{
 			ip: mustIP("192.0.2.1"),
