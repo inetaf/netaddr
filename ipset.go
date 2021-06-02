@@ -336,7 +336,12 @@ func (s *IPSet) Equal(o *IPSet) bool {
 }
 
 // Contains reports whether ip is in s.
+// If ip has an IPv6 zone, Contains returns false,
+// because IPSets do not track zones.
 func (s *IPSet) Contains(ip IP) bool {
+	if ip.hasZone() {
+		return false
+	}
 	// TODO: data structure permitting more efficient lookups:
 	// https://github.com/inetaf/netaddr/issues/139
 	i := sort.Search(len(s.rr), func(i int) bool {
@@ -346,7 +351,7 @@ func (s *IPSet) Contains(ip IP) bool {
 		return false
 	}
 	i--
-	return s.rr[i].contains(ip.withoutZone())
+	return s.rr[i].contains(ip)
 }
 
 // ContainsRange reports whether all IPs in r are in s.

@@ -46,6 +46,7 @@ func TestInlining(t *testing.T) {
 		"(*IPSet).Ranges",
 		"(*uint128).halves",
 		"IP.BitLen",
+		"IP.hasZone",
 		"IP.IPAddr",
 		"IP.Is4",
 		"IP.Is4in6",

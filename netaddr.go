@@ -551,6 +551,11 @@ func (ip IP) withoutZone() IP {
 	return ip
 }
 
+// hasZone reports whether IP has an IPv6 zone.
+func (ip IP) hasZone() bool {
+	return ip.z != z0 && ip.z != z4 && ip.z != z6noz
+}
+
 // IsLinkLocalUnicast reports whether ip is a link-local unicast address.
 // If ip is the zero value, it will return false.
 func (ip IP) IsLinkLocalUnicast() bool {
@@ -1333,9 +1338,10 @@ func (p IPPrefix) IPNet() *net.IPNet {
 // An IPv4 address will not match an IPv6 prefix.
 // A v6-mapped IPv6 address will not match an IPv4 prefix.
 // A zero-value IP will not match any prefix.
-// ip's zone, if any, is ignored.
+// If ip has an IPv6 zone, Contains returns false,
+// because IPPrefixes strip zones.
 func (p IPPrefix) Contains(ip IP) bool {
-	if !p.Valid() {
+	if !p.Valid() || ip.hasZone() {
 		return false
 	}
 	if f1, f2 := p.ip.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
@@ -1574,8 +1580,11 @@ func (r IPRange) Valid() bool {
 // Contains reports whether the range r includes addr.
 //
 // An invalid range always reports false.
+//
+// If ip has an IPv6 zone, Contains returns false,
+// because IPPrefixes strip zones.
 func (r IPRange) Contains(addr IP) bool {
-	return r.Valid() && r.contains(addr.withoutZone())
+	return r.Valid() && !addr.hasZone() && r.contains(addr)
 }
 
 // contains is like Contains, but without the validity check.
