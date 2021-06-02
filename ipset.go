@@ -287,6 +287,7 @@ var debugf = discardf
 // and contains all modifications made with valid inputs.
 //
 // The builder remains usable after calling IPSet.
+// Calling IPSet clears any accumulated errors.
 func (s *IPSetBuilder) IPSet() (*IPSet, error) {
 	s.normalize()
 	ret := &IPSet{
@@ -295,7 +296,9 @@ func (s *IPSetBuilder) IPSet() (*IPSet, error) {
 	if len(s.errs) == 0 {
 		return ret, nil
 	} else {
-		return ret, s.errs
+		errs := s.errs
+		s.errs = nil
+		return ret, errs
 	}
 }
 
