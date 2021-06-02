@@ -528,6 +528,9 @@ func TestIPSetContains(t *testing.T) {
 		{"fc00::1", true},
 		{"fd00::1", true},
 		{"ff00::1", false},
+
+		{"fd00::%a", false},
+		{"fd00::1%a", false},
 	}
 	for _, tt := range tests {
 		got := s.Contains(mustIP(tt.ip))

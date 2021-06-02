@@ -1375,8 +1375,8 @@ func TestIPPrefix(t *testing.T) {
 				IP:   net.ParseIP("::"), // net.IPNet drops zones
 				Mask: net.CIDRMask(80, 128),
 			},
-			contains:    mustIPs("::%0/00", "::%1/23"),
-			notContains: mustIPs("ff::%0/00", "ff::%1/23"),
+			contains:    mustIPs("::"),
+			notContains: mustIPs("ff::%0/00", "ff::%1/23", "::%0/00", "::%1/23"),
 		},
 	}
 	for _, test := range tests {
@@ -2353,6 +2353,7 @@ func TestIPRangeContains(t *testing.T) {
 			[]rtest{
 				{mustIP("::0"), false},
 				{mustIP("::1"), true},
+				{mustIP("::1%z"), false},
 				{mustIP("::ffff"), true},
 				{mustIP("1::"), false},
 				{mustIP("0.0.0.1"), false},
@@ -2606,6 +2607,9 @@ func TestIPPrefixContains(t *testing.T) {
 		{mustIPPrefix("::1/127"), mustIP("::2"), false},
 		{mustIPPrefix("::1/128"), mustIP("::1"), true},
 		{mustIPPrefix("::1/127"), mustIP("::2"), false},
+		// zones support
+		{mustIPPrefix("::1%a/128"), mustIP("::1"), true},    // prefix zones are stripped...
+		{mustIPPrefix("::1%a/128"), mustIP("::1%a"), false}, // but ip zones are not
 		// invalid IP
 		{mustIPPrefix("::1/0"), IP{}, false},
 		{mustIPPrefix("1.2.3.4/0"), IP{}, false},
