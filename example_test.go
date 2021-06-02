@@ -45,7 +45,7 @@ func ExampleIP_properties() {
 	w.Flush()
 	// Output:
 	// String()           Zone()  IsZero()  Is4()  Is6()  Is4in6()
-	// invalid IP                 true      false  false  false
+	// zero IP                    true      false  false  false
 	// 192.0.2.3                  false     true   false  false
 	// 2001:db8::68               false     false  true   false
 	// 2001:db8::68%eth0  eth0    false     false  true   false
