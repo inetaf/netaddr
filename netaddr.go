@@ -1542,6 +1542,9 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 
 // String returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
+	if p.IsZero() {
+		return "zero IPPrefix"
+	}
 	if !p.Valid() {
 		return "invalid IPPrefix"
 	}
