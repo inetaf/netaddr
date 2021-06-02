@@ -183,6 +183,7 @@ func (s *IPSetBuilder) addError(msg string, args ...interface{}) {
 // Add adds ip to s.
 func (s *IPSetBuilder) Add(ip IP) {
 	if ip.IsZero() {
+		s.addError("Add of invalid IP %q", ip)
 		return
 	}
 	s.AddRange(IPRangeFrom(ip, ip))
