@@ -18,12 +18,12 @@ import (
 func TestStacktraceErr(t *testing.T) {
 	b := new(netaddr.IPSetBuilder)
 //line ipp.go:1
-	b.AddPrefix(netaddr.IPPrefix{})
+	b.AddPrefix(netaddr.IPPrefixFrom(netaddr.IPv4(1,2,3,4), 33))
 //line r.go:2
 	b.AddRange(netaddr.IPRange{})
 	_, err := b.IPSet()
 	got := err.Error()
-	for _, want := range []string{"ipp.go:1", "r.go:2"} {
+	for _, want := range []string{"ipp.go:1", "r.go:2", "33"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("error should contain %q, got %q", want, got)
 		}

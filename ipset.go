@@ -183,7 +183,7 @@ func (s *IPSetBuilder) addError(msg string, args ...interface{}) {
 // Add adds ip to s.
 func (s *IPSetBuilder) Add(ip IP) {
 	if ip.IsZero() {
-		s.addError("Add of invalid IP %q", ip)
+		s.addError("Add(IP{})")
 		return
 	}
 	s.AddRange(IPRangeFrom(ip, ip))
@@ -194,7 +194,7 @@ func (s *IPSetBuilder) AddPrefix(p IPPrefix) {
 	if r := p.Range(); r.IsValid() {
 		s.AddRange(r)
 	} else {
-		s.addError("AddPrefix of invalid prefix %q", p)
+		s.addError("AddPrefix(%v/%v)", p.IP(), p.Bits())
 	}
 }
 
@@ -202,7 +202,7 @@ func (s *IPSetBuilder) AddPrefix(p IPPrefix) {
 // If r is not Valid, AddRange does nothing.
 func (s *IPSetBuilder) AddRange(r IPRange) {
 	if !r.IsValid() {
-		s.addError("AddRange of invalid range %q", r)
+		s.addError("AddRange(%v-%v)", r.From(), r.To())
 		return
 	}
 	// If there are any removals (s.out), then we need to compact the set
@@ -226,7 +226,7 @@ func (s *IPSetBuilder) AddSet(b *IPSet) {
 // Remove removes ip from s.
 func (s *IPSetBuilder) Remove(ip IP) {
 	if ip.IsZero() {
-		s.addError("ignored Remove of zero IP")
+		s.addError("Remove(IP{})")
 	} else {
 		s.RemoveRange(IPRangeFrom(ip, ip))
 	}
@@ -237,7 +237,7 @@ func (s *IPSetBuilder) RemovePrefix(p IPPrefix) {
 	if r := p.Range(); r.IsValid() {
 		s.RemoveRange(r)
 	} else {
-		s.addError("RemovePrefix of invalid prefix %q", p)
+		s.addError("RemovePrefix(%v/%v)", p.IP(), p.Bits())
 	}
 }
 
@@ -246,7 +246,7 @@ func (s *IPSetBuilder) RemoveRange(r IPRange) {
 	if r.IsValid() {
 		s.out = append(s.out, r)
 	} else {
-		s.addError("RemoveRange of invalid range %q", r)
+		s.addError("RemoveRange(%v-%v)", r.From(), r.To())
 	}
 }
 
