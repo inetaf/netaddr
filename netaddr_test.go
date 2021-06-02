@@ -2922,7 +2922,7 @@ func TestIPPrefixString(t *testing.T) {
 		ipp  IPPrefix
 		want string
 	}{
-		{IPPrefix{}, "invalid IPPrefix"},
+		{IPPrefix{}, "zero IPPrefix"},
 		{IPPrefixFrom(IP{}, 8), "invalid IPPrefix"},
 		{IPPrefixFrom(MustParseIP("1.2.3.4"), 88), "invalid IPPrefix"},
 	}
