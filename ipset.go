@@ -276,8 +276,16 @@ func discardf(format string, args ...interface{}) {}
 // debugf is reassigned by tests.
 var debugf = discardf
 
-// IPSet returns an immutable IPSet representing the current state of
-// s, along with any errors accumulated during the construction of s.
+// IPSet returns an immutable IPSet representing the current state of s.
+//
+// Most IPSetBuilder methods do not return errors.
+// Rather, the builder ignores any invalid inputs (such as an invalid IPPrefix),
+// and accumulates a list of any such errors that it encountered.
+//
+// IPSet also reports any such accumulated errors.
+// Even if the returned error is non-nil, the returned IPSet is usable
+// and contains all modifications made with valid inputs.
+//
 // The builder remains usable after calling IPSet.
 func (s *IPSetBuilder) IPSet() (*IPSet, error) {
 	s.normalize()
