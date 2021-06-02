@@ -93,6 +93,9 @@ func IPv4(a, b, c, d uint8) IP {
 	}
 }
 
+// IPv4Zero returns the IPv4 zero address 0.0.0.0.
+func IPv4Zero() IP { return IP{z: z4} }
+
 // IPv6Raw returns the IPv6 address given by the bytes in addr,
 // without an implicit Unmap call to unmap any v6-mapped IPv4
 // address.

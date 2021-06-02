@@ -89,6 +89,7 @@ func TestInlining(t *testing.T) {
 		"IPRange.To",
 		"IPRange.From",
 		"IPv4",
+		"IPv4Zero",
 		"IPFrom4",
 		"IPv6LinkLocalAllNodes",
 		"IPv6Unspecified",

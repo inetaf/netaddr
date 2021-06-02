@@ -697,6 +697,11 @@ func TestIPWellKnown(t *testing.T) {
 		std  net.IP
 	}{
 		{
+			name: "IPv4 zero",
+			ip:   IPv4Zero(),
+			std:  net.IPv4zero,
+		},
+		{
 			name: "IPv6 link-local all nodes",
 			ip:   IPv6LinkLocalAllNodes(),
 			std:  net.IPv6linklocalallnodes,
@@ -2719,6 +2724,7 @@ func TestNoAllocs(t *testing.T) {
 
 	// IP constructors
 	test("IPv4", func() { sinkIP = IPv4(1, 2, 3, 4) })
+	test("IPv4Zero", func() { sinkIP = IPv4Zero() })
 	test("IPFrom4", func() { sinkIP = IPFrom4([4]byte{1, 2, 3, 4}) })
 	test("IPv6", func() { sinkIP = IPv6Raw([16]byte{}) })
 	test("IPFrom16", func() { sinkIP = IPFrom16([16]byte{15: 1}) })
