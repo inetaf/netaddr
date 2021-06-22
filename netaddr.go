@@ -632,6 +632,33 @@ func (ip IP) IsLinkLocalMulticast() bool {
 	return false // zero value
 }
 
+// IsGlobalUnicast reports whether ip is a global unicast address.
+//
+// It returns true for IPv6 addresses which fall outside of the current
+// IANA-allocated 2000::/3 global unicast space, with the exception of the
+// link-local address space. It also returns true even if ip is in the IPv4
+// private address space or IPv6 unique local address space. If ip is the zero
+// value, it will return false.
+//
+// For reference, see RFC 1122, RFC 4291, and RFC 4632.
+func (ip IP) IsGlobalUnicast() bool {
+	if ip.z == z0 {
+		// Invalid or zero-value.
+		return false
+	}
+
+	// Match the stdlib's IsGlobalUnicast logic. Notably private IPv4 addresses
+	// and ULA IPv6 addresses are still considered "global unicast".
+	if ip.Is4() && (ip == IPv4(0, 0, 0, 0) || ip == IPv4(255, 255, 255, 255)) {
+		return false
+	}
+
+	return ip != IPv6Unspecified() &&
+		!ip.IsLoopback() &&
+		!ip.IsMulticast() &&
+		!ip.IsLinkLocalUnicast()
+}
+
 // Prefix applies a CIDR mask of leading bits to IP, producing an IPPrefix
 // of the specified length. If IP is the zero value, a zero-value IPPrefix and
 // a nil error are returned. If bits is larger than 32 for an IPv4 address or
