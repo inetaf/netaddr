@@ -157,6 +157,20 @@ func ExampleIP_IsGlobalUnicast() {
 	// (::ffff:c000:203).IsGlobalUnicast() -> true
 }
 
+func ExampleIP_IsUnspecified() {
+	var zeroIP netaddr.IP
+	ipv4AllZeroes := netaddr.MustParseIP("0.0.0.0")
+	ipv6AllZeroes := netaddr.MustParseIP("::")
+
+	fmt.Printf("IP{}.IsUnspecified() -> %v\n", zeroIP.IsUnspecified())
+	fmt.Printf("(%v).IsUnspecified() -> %v\n", ipv4AllZeroes, ipv4AllZeroes.IsUnspecified())
+	fmt.Printf("(%v).IsUnspecified() -> %v\n", ipv6AllZeroes, ipv6AllZeroes.IsUnspecified())
+	// Output:
+	// IP{}.IsUnspecified() -> false
+	// (0.0.0.0).IsUnspecified() -> true
+	// (::).IsUnspecified() -> true
+}
+
 func ExampleIP_String() {
 	ipv4 := netaddr.MustParseIP("192.0.2.3")
 	ipv6 := netaddr.MustParseIP("2001:db8::68")

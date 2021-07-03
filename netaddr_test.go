@@ -572,6 +572,9 @@ func TestIPProperties(t *testing.T) {
 
 		ilm6     = mustIP("ff01::1")
 		ilmZone6 = mustIP("ff01::1%eth0")
+
+		unspecified4 = IPv4(0, 0, 0, 0)
+		unspecified6 = IPv6Unspecified()
 	)
 
 	tests := []struct {
@@ -583,6 +586,7 @@ func TestIPProperties(t *testing.T) {
 		linkLocalUnicast        bool
 		loopback                bool
 		multicast               bool
+		unspecified             bool
 	}{
 		{
 			name: "nil",
@@ -668,6 +672,16 @@ func TestIPProperties(t *testing.T) {
 			interfaceLocalMulticast: true,
 			multicast:               true,
 		},
+		{
+			name:        "unspecified v4Addr",
+			ip:          unspecified4,
+			unspecified: true,
+		},
+		{
+			name:        "unspecified v6Addr",
+			ip:          unspecified6,
+			unspecified: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -700,6 +714,11 @@ func TestIPProperties(t *testing.T) {
 			multicast := tt.ip.IsMulticast()
 			if multicast != tt.multicast {
 				t.Errorf("IsMulticast(%v) = %v; want %v", tt.ip, multicast, tt.multicast)
+			}
+
+			unspecified := tt.ip.IsUnspecified()
+			if unspecified != tt.unspecified {
+				t.Errorf("IsUnspecified(%v) = %v; want %v", tt.ip, unspecified, tt.unspecified)
 			}
 		})
 	}
@@ -2776,6 +2795,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IP.IsLinkLocalUnicast", func() { sinkBool = MustParseIP("fe80::1").IsLinkLocalUnicast() })
 	test("IP.IsLoopback", func() { sinkBool = MustParseIP("fe80::1").IsLoopback() })
 	test("IP.IsMulticast", func() { sinkBool = MustParseIP("fe80::1").IsMulticast() })
+	test("IP.IsUnspecified", func() { sinkBool = IPv6Unspecified().IsUnspecified() })
 	test("IP.Prefix/4", func() { sinkIPPrefix = panicPfx(MustParseIP("1.2.3.4").Prefix(20)) })
 	test("IP.Prefix/6", func() { sinkIPPrefix = panicPfx(MustParseIP("fe80::1").Prefix(64)) })
 	test("IP.As16", func() { sinkIP16 = MustParseIP("1.2.3.4").As16() })

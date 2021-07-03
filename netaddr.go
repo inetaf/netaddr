@@ -402,7 +402,8 @@ func (ip IP) v6u16(i uint8) uint16 {
 // IsZero reports whether ip is the zero value of the IP type.
 // The zero value is not a valid IP address of any type.
 //
-// Note that "0.0.0.0" and "::" are not the zero value.
+// Note that "0.0.0.0" and "::" are not the zero value. Use IsUnspecified to
+// check for these values instead.
 func (ip IP) IsZero() bool {
 	// Faster than comparing ip == IP{}, but effectively equivalent,
 	// as there's no way to make an IP with a nil z from this package.
@@ -657,6 +658,15 @@ func (ip IP) IsGlobalUnicast() bool {
 		!ip.IsLoopback() &&
 		!ip.IsMulticast() &&
 		!ip.IsLinkLocalUnicast()
+}
+
+// IsUnspecified reports whether ip is an unspecified address, either the IPv4
+// address "0.0.0.0" or the IPv6 address "::".
+//
+// Note that the IP zero value is not an unspecified address. Use IsZero to
+// check for the zero value instead.
+func (ip IP) IsUnspecified() bool {
+	return ip == IPv4(0, 0, 0, 0) || ip == IPv6Unspecified()
 }
 
 // Prefix applies a CIDR mask of leading bits to IP, producing an IPPrefix
