@@ -117,6 +117,46 @@ func ExampleIP_IsZero() {
 	// (::).IsZero() -> false
 }
 
+func ExampleIP_IsGlobalUnicast() {
+	var (
+		zeroIP netaddr.IP
+
+		ipv4AllZeroes = netaddr.MustParseIP("0.0.0.0")
+		ipv4          = netaddr.MustParseIP("192.0.2.3")
+
+		ipv6AllZeroes  = netaddr.MustParseIP("::")
+		ipv6LinkLocal  = netaddr.MustParseIP("fe80::1")
+		ipv6           = netaddr.MustParseIP("2001:db8::68")
+		ipv6Unassigned = netaddr.MustParseIP("4000::1")
+		ip4in6         = netaddr.MustParseIP("::ffff:192.0.2.3")
+	)
+
+	fmt.Printf("IP{}.IsGlobalUnicast() -> %v\n", zeroIP.IsGlobalUnicast())
+
+	ips := []netaddr.IP{
+		ipv4AllZeroes,
+		ipv4,
+		ipv6AllZeroes,
+		ipv6LinkLocal,
+		ipv6,
+		ipv6Unassigned,
+		ip4in6,
+	}
+
+	for _, ip := range ips {
+		fmt.Printf("(%v).IsGlobalUnicast() -> %v\n", ip, ip.IsGlobalUnicast())
+	}
+	// Output:
+	// IP{}.IsGlobalUnicast() -> false
+	// (0.0.0.0).IsGlobalUnicast() -> false
+	// (192.0.2.3).IsGlobalUnicast() -> true
+	// (::).IsGlobalUnicast() -> false
+	// (fe80::1).IsGlobalUnicast() -> false
+	// (2001:db8::68).IsGlobalUnicast() -> true
+	// (4000::1).IsGlobalUnicast() -> true
+	// (::ffff:c000:203).IsGlobalUnicast() -> true
+}
+
 func ExampleIP_String() {
 	ipv4 := netaddr.MustParseIP("192.0.2.3")
 	ipv6 := netaddr.MustParseIP("2001:db8::68")
