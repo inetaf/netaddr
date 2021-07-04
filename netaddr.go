@@ -409,6 +409,12 @@ func (ip IP) IsZero() bool {
 	return ip.z == z0
 }
 
+// IsValid whether the IP is an initialized value and not the IP
+// type's zero value.
+//
+// Note that both "0.0.0.0" and "::" are valid, non-zero values.
+func (ip IP) IsValid() bool { return ip.z != z0 }
+
 // BitLen returns the number of bits in the IP address:
 // 32 for IPv4 or 128 for IPv6.
 // For the zero value (see IP.IsZero), it returns 0.
@@ -1105,9 +1111,15 @@ func MustParseIPPort(s string) IPPort {
 // IsZero reports whether p is its zero value.
 func (p IPPort) IsZero() bool { return p == IPPort{} }
 
-// Valid reports whether p.IP() is non-zero.
+// IsValid reports whether p.IP() is valid.
 // All ports are valid, including zero.
-func (p IPPort) Valid() bool { return !p.ip.IsZero() }
+func (p IPPort) IsValid() bool { return p.ip.IsValid() }
+
+// Valid reports whether p.IP() is valid.
+// All ports are valid, including zero.
+//
+// Deprecated: use the correctly named and identical IsValid method instead.
+func (p IPPort) Valid() bool { return p.IsValid() }
 
 func (p IPPort) String() string {
 	switch p.ip.z {
@@ -1252,9 +1264,15 @@ func (p IPPrefix) IP() IP { return p.ip }
 // Bits returns p's prefix length.
 func (p IPPrefix) Bits() uint8 { return p.bits }
 
+// IsValid reports whether whether p.Bits() has a valid range for p.IP().
+// If p.IP() is zero, Valid returns false.
+func (p IPPrefix) IsValid() bool { return !p.ip.IsZero() && p.bits <= p.ip.BitLen() }
+
 // Valid reports whether whether p.Bits() has a valid range for p.IP().
 // If p.IP() is zero, Valid returns false.
-func (p IPPrefix) Valid() bool { return !p.ip.IsZero() && p.bits <= p.ip.BitLen() }
+//
+// Deprecated: use the correctly named and identical IsValid method instead.
+func (p IPPrefix) Valid() bool { return p.IsValid() }
 
 // IsZero reports whether p is its zero value.
 func (p IPPrefix) IsZero() bool { return p == IPPrefix{} }
@@ -1595,14 +1613,21 @@ func (r IPRange) String() string {
 	return "invalid IPRange"
 }
 
-// Valid reports whether r.From() and r.To() are both non-zero and
+// IsValid reports whether r.From() and r.To() are both non-zero and
 // obey the documented requirements: address families match, and From
 // is less than or equal to To.
-func (r IPRange) Valid() bool {
+func (r IPRange) IsValid() bool {
 	return !r.from.IsZero() &&
 		r.from.z == r.to.z &&
 		!r.to.Less(r.from)
 }
+
+// Valid reports whether r.From() and r.To() are both non-zero and
+// obey the documented requirements: address families match, and From
+// is less than or equal to To.
+//
+// Deprecated: use the correctly named and identical IsValid method instead.
+func (r IPRange) Valid() bool { return r.IsValid() }
 
 // Contains reports whether the range r includes addr.
 //
