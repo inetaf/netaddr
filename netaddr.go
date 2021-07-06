@@ -666,6 +666,29 @@ func (ip IP) IsGlobalUnicast() bool {
 		!ip.IsLinkLocalUnicast()
 }
 
+// IsPrivate reports whether ip is a private address, according to RFC 1918
+// (IPv4 addresses) and RFC 4193 (IPv6 addresses). That is, it reports whether
+// ip is in 10.0.0.0/8, 172.16.0.0/12, 192.168.0.0/16, or fc00::/7. This is the
+// same as the standard library's net.IP.IsPrivate.
+func (ip IP) IsPrivate() bool {
+	// Match the stdlib's IsPrivate logic.
+	if ip.Is4() {
+		// RFC 1918 allocates 10.0.0.0/8, 172.16.0.0/12, and 192.168.0.0/16 as
+		// private IPv4 address subnets.
+		return ip.v4(0) == 10 ||
+			(ip.v4(0) == 172 && ip.v4(1)&0xf0 == 16) ||
+			(ip.v4(0) == 192 && ip.v4(1) == 168)
+	}
+
+	if ip.Is6() {
+		// RFC 4193 allocates fc00::/7 as the unique local unicast IPv6 address
+		// subnet.
+		return ip.v6(0)&0xfe == 0xfc
+	}
+
+	return false // zero value
+}
+
 // IsUnspecified reports whether ip is an unspecified address, either the IPv4
 // address "0.0.0.0" or the IPv6 address "::".
 //

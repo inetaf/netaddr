@@ -573,6 +573,11 @@ func TestIPProperties(t *testing.T) {
 		ilm6     = mustIP("ff01::1")
 		ilmZone6 = mustIP("ff01::1%eth0")
 
+		private4a = mustIP("10.0.0.1")
+		private4b = mustIP("172.16.0.1")
+		private4c = mustIP("192.168.1.1")
+		private6  = mustIP("fd00::1")
+
 		unspecified4 = IPv4(0, 0, 0, 0)
 		unspecified6 = IPv6Unspecified()
 	)
@@ -586,6 +591,7 @@ func TestIPProperties(t *testing.T) {
 		linkLocalUnicast        bool
 		loopback                bool
 		multicast               bool
+		private                 bool
 		unspecified             bool
 	}{
 		{
@@ -673,6 +679,30 @@ func TestIPProperties(t *testing.T) {
 			multicast:               true,
 		},
 		{
+			name:          "private v4Addr 10/8",
+			ip:            private4a,
+			globalUnicast: true,
+			private:       true,
+		},
+		{
+			name:          "private v4Addr 172.16/12",
+			ip:            private4b,
+			globalUnicast: true,
+			private:       true,
+		},
+		{
+			name:          "private v4Addr 192.168/16",
+			ip:            private4c,
+			globalUnicast: true,
+			private:       true,
+		},
+		{
+			name:          "private v6Addr",
+			ip:            private6,
+			globalUnicast: true,
+			private:       true,
+		},
+		{
 			name:        "unspecified v4Addr",
 			ip:          unspecified4,
 			unspecified: true,
@@ -714,6 +744,11 @@ func TestIPProperties(t *testing.T) {
 			multicast := tt.ip.IsMulticast()
 			if multicast != tt.multicast {
 				t.Errorf("IsMulticast(%v) = %v; want %v", tt.ip, multicast, tt.multicast)
+			}
+
+			private := tt.ip.IsPrivate()
+			if private != tt.private {
+				t.Errorf("IsPrivate(%v) = %v; want %v", tt.ip, private, tt.private)
 			}
 
 			unspecified := tt.ip.IsUnspecified()
@@ -2795,6 +2830,7 @@ func TestNoAllocs(t *testing.T) {
 	test("IP.IsLinkLocalUnicast", func() { sinkBool = MustParseIP("fe80::1").IsLinkLocalUnicast() })
 	test("IP.IsLoopback", func() { sinkBool = MustParseIP("fe80::1").IsLoopback() })
 	test("IP.IsMulticast", func() { sinkBool = MustParseIP("fe80::1").IsMulticast() })
+	test("IP.IsPrivate", func() { sinkBool = MustParseIP("fd00::1").IsPrivate() })
 	test("IP.IsUnspecified", func() { sinkBool = IPv6Unspecified().IsUnspecified() })
 	test("IP.Prefix/4", func() { sinkIPPrefix = panicPfx(MustParseIP("1.2.3.4").Prefix(20)) })
 	test("IP.Prefix/6", func() { sinkIPPrefix = panicPfx(MustParseIP("fe80::1").Prefix(64)) })

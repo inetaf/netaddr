@@ -157,6 +157,37 @@ func ExampleIP_IsGlobalUnicast() {
 	// (::ffff:c000:203).IsGlobalUnicast() -> true
 }
 
+func ExampleIP_IsPrivate() {
+	var (
+		zeroIP netaddr.IP
+
+		ipv4        = netaddr.MustParseIP("192.0.2.3")
+		ipv4Private = netaddr.MustParseIP("192.168.1.1")
+
+		ipv6        = netaddr.MustParseIP("2001:db8::68")
+		ipv6Private = netaddr.MustParseIP("fd00::1")
+	)
+
+	fmt.Printf("IP{}.IsPrivate() -> %v\n", zeroIP.IsPrivate())
+
+	ips := []netaddr.IP{
+		ipv4,
+		ipv4Private,
+		ipv6,
+		ipv6Private,
+	}
+
+	for _, ip := range ips {
+		fmt.Printf("(%v).IsPrivate() -> %v\n", ip, ip.IsPrivate())
+	}
+	// Output:
+	// IP{}.IsPrivate() -> false
+	// (192.0.2.3).IsPrivate() -> false
+	// (192.168.1.1).IsPrivate() -> true
+	// (2001:db8::68).IsPrivate() -> false
+	// (fd00::1).IsPrivate() -> true
+}
+
 func ExampleIP_IsUnspecified() {
 	var zeroIP netaddr.IP
 	ipv4AllZeroes := netaddr.MustParseIP("0.0.0.0")
