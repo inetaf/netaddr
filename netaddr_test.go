@@ -2337,6 +2337,8 @@ func TestParseIPRange(t *testing.T) {
 		want interface{}
 	}{
 		{"", "no hyphen in range \"\""},
+		{"foo-", `invalid From IP "foo" in range "foo-"`},
+		{"1.2.3.4-foo", `invalid To IP "foo" in range "1.2.3.4-foo"`},
 		{"1.2.3.4-5.6.7.8", IPRange{mustIP("1.2.3.4"), mustIP("5.6.7.8")}},
 		{"1.2.3.4-0.1.2.3", "range 1.2.3.4 to 0.1.2.3 not valid"},
 		{"::1-::5", IPRange{mustIP("::1"), mustIP("::5")}},
