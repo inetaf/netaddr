@@ -64,7 +64,7 @@ func (s *IPSetBuilder) normalize() {
 		}
 
 		switch {
-		case !rout.Valid() || !rin.Valid():
+		case !rout.IsValid() || !rin.IsValid():
 			// mergeIPRanges should have prevented invalid ranges from
 			// sneaking in.
 			panic("invalid IPRanges during Ranges merge")
@@ -178,7 +178,7 @@ func (s *IPSetBuilder) Add(ip IP) {
 
 // AddPrefix adds all IPs in p to s.
 func (s *IPSetBuilder) AddPrefix(p IPPrefix) {
-	if r := p.Range(); r.Valid() {
+	if r := p.Range(); r.IsValid() {
 		s.AddRange(r)
 	} else {
 		s.errs = append(s.errs, fmt.Errorf("AddPrefix of invalid prefix %q", p))
@@ -188,7 +188,7 @@ func (s *IPSetBuilder) AddPrefix(p IPPrefix) {
 // AddRange adds r to s.
 // If r is not Valid, AddRange does nothing.
 func (s *IPSetBuilder) AddRange(r IPRange) {
-	if !r.Valid() {
+	if !r.IsValid() {
 		s.errs = append(s.errs, fmt.Errorf("AddRange of invalid range %q", r))
 		return
 	}
@@ -221,7 +221,7 @@ func (s *IPSetBuilder) Remove(ip IP) {
 
 // RemovePrefix removes all IPs in p from s.
 func (s *IPSetBuilder) RemovePrefix(p IPPrefix) {
-	if r := p.Range(); r.Valid() {
+	if r := p.Range(); r.IsValid() {
 		s.RemoveRange(r)
 	} else {
 		s.errs = append(s.errs, fmt.Errorf("RemovePrefix of invalid prefix %q", p))
@@ -230,7 +230,7 @@ func (s *IPSetBuilder) RemovePrefix(p IPPrefix) {
 
 // RemoveRange removes all IPs in r from s.
 func (s *IPSetBuilder) RemoveRange(r IPRange) {
-	if r.Valid() {
+	if r.IsValid() {
 		s.out = append(s.out, r)
 	} else {
 		s.errs = append(s.errs, fmt.Errorf("RemoveRange of invalid range %q", r))
