@@ -1799,14 +1799,14 @@ func TestIPPortMarshalUnmarshal(t *testing.T) {
 	}
 }
 
-type appendMarshaller interface {
+type appendMarshaler interface {
 	encoding.TextMarshaler
 	AppendTo([]byte) []byte
 }
 
 // testAppendToMarshal tests that x's AppendTo and MarshalText methods yield the same results.
 // x's MarshalText method must not return an error.
-func testAppendToMarshal(t *testing.T, x appendMarshaller) {
+func testAppendToMarshal(t *testing.T, x appendMarshaler) {
 	t.Helper()
 	m, err := x.MarshalText()
 	if err != nil {

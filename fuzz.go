@@ -129,13 +129,8 @@ func checkBinaryMarshaller(x encoding.BinaryMarshaler) {
 	}
 }
 
-type appendMarshaller interface {
-	encoding.TextMarshaler
-	AppendTo([]byte) []byte
-}
-
 // checkTextMarshalMatchesAppendTo checks that x's MarshalText matches x's AppendTo.
-func checkTextMarshalMatchesAppendTo(x appendMarshaller) {
+func checkTextMarshalMatchesAppendTo(x appendMarshaler) {
 	buf, err := x.MarshalText()
 	if err != nil {
 		panic(err)
@@ -189,7 +184,7 @@ func checkEncoding(x interface{}) {
 	if bm, ok := x.(encoding.BinaryMarshaler); ok {
 		checkBinaryMarshaller(bm)
 	}
-	if am, ok := x.(appendMarshaller); ok {
+	if am, ok := x.(appendMarshaler); ok {
 		checkTextMarshalMatchesAppendTo(am)
 	}
 }
