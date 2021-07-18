@@ -1209,7 +1209,7 @@ func (p IPPort) MarshalText() ([]byte, error) {
 // value.
 func (p *IPPort) UnmarshalText(text []byte) error {
 	if p.ip.z != z0 || p.port != 0 {
-		return errors.New("netaddr: refusing to UnmarshalText into non-zero IP")
+		return errors.New("netaddr: refusing to Unmarshal into non-zero IPPort")
 	}
 	if len(text) == 0 {
 		return nil
@@ -1530,11 +1530,9 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 	if *p != (IPPrefix{}) {
 		return errors.New("netaddr: refusing to Unmarshal into non-zero IPPrefix")
 	}
-
 	if len(text) == 0 {
 		return nil
 	}
-
 	var err error
 	*p, err = ParseIPPrefix(string(text))
 	return err
