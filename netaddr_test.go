@@ -1506,9 +1506,9 @@ func TestIPPrefixValid(t *testing.T) {
 		{IPPrefix{IP{}, 128}, false},
 	}
 	for _, tt := range tests {
-		got := tt.ipp.Valid()
+		got := tt.ipp.IsValid()
 		if got != tt.want {
-			t.Errorf("(%v).Valid() = %v want %v", tt.ipp, got, tt.want)
+			t.Errorf("(%v).IsValid() = %v want %v", tt.ipp, got, tt.want)
 		}
 	}
 }
@@ -2522,7 +2522,7 @@ func TestIPRangeValid(t *testing.T) {
 		{IPRange{mustIP("1.2.3.4"), mustIP("::1")}, false},     // family mismatch
 	}
 	for _, tt := range tests {
-		got := tt.r.Valid()
+		got := tt.r.IsValid()
 		if got != tt.want {
 			t.Errorf("range %v to %v Valid = %v; want %v", tt.r.From(), tt.r.To(), got, tt.want)
 		}
@@ -2882,7 +2882,7 @@ func TestNoAllocs(t *testing.T) {
 	test("ParseIPRange", func() { sinkIPRange = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")) })
 
 	// IPRange methods
-	test("IPRange.Valid", func() { sinkBool = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")).Valid() })
+	test("IPRange.Valid", func() { sinkBool = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")).IsValid() })
 	test("IPRange.Overlaps", func() {
 		a := panicIPR(ParseIPRange("1.2.3.0-1.2.3.150"))
 		b := panicIPR(ParseIPRange("1.2.4.0-1.2.4.255"))

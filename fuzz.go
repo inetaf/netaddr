@@ -154,8 +154,8 @@ func parseIPPort(s string) (interface{}, error)   { return ParseIPPort(s) }
 func parseIPPrefix(s string) (interface{}, error) { return ParseIPPrefix(s) }
 
 func checkStringParseRoundTrip(x fmt.Stringer, parse func(string) (interface{}, error)) {
-	v, vok := x.(interface{ Valid() bool })
-	if vok && !v.Valid() {
+	v, vok := x.(interface{ IsValid() bool })
+	if vok && !v.IsValid() {
 		// Ignore invalid values.
 		return
 	}
@@ -163,7 +163,7 @@ func checkStringParseRoundTrip(x fmt.Stringer, parse func(string) (interface{}, 
 	// The exception is if they have a Valid method and that Valid method
 	// explicitly says that the zero value is valid.
 	z, zok := x.(interface{ IsZero() bool })
-	if zok && z.IsZero() && !(vok && v.Valid()) {
+	if zok && z.IsZero() && !(vok && v.IsValid()) {
 		return
 	}
 	s := x.String()

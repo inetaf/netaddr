@@ -321,7 +321,7 @@ func TestIPSet(t *testing.T) {
 			got := s.Ranges()
 			t.Run("ranges", func(t *testing.T) {
 				for _, v := range got {
-					if !v.Valid() {
+					if !v.IsValid() {
 						t.Errorf("invalid IPRange in result: %s -> %s", v.From(), v.To())
 					}
 				}

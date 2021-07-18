@@ -1401,7 +1401,7 @@ func (p IPPrefix) Range() IPRange {
 // The returned value is always non-nil.
 // Any zone identifier is dropped in the conversion.
 func (p IPPrefix) IPNet() *net.IPNet {
-	if !p.Valid() {
+	if !p.IsValid() {
 		return &net.IPNet{}
 	}
 	stdIP, _ := p.ip.ipZone(nil)
@@ -1419,7 +1419,7 @@ func (p IPPrefix) IPNet() *net.IPNet {
 // If ip has an IPv6 zone, Contains returns false,
 // because IPPrefixes strip zones.
 func (p IPPrefix) Contains(ip IP) bool {
-	if !p.Valid() || ip.hasZone() {
+	if !p.IsValid() || ip.hasZone() {
 		return false
 	}
 	if f1, f2 := p.ip.BitLen(), ip.BitLen(); f1 == 0 || f2 == 0 || f1 != f2 {
@@ -1451,7 +1451,7 @@ func (p IPPrefix) Contains(ip IP) bool {
 //
 // If either has a Bits of zero, it returns true.
 func (p IPPrefix) Overlaps(o IPPrefix) bool {
-	if !p.Valid() || !o.Valid() {
+	if !p.IsValid() || !o.IsValid() {
 		return false
 	}
 	if p == o {
@@ -1490,7 +1490,7 @@ func (p IPPrefix) AppendTo(b []byte) []byte {
 	if p.IsZero() {
 		return b
 	}
-	if !p.Valid() {
+	if !p.IsValid() {
 		return append(b, "invalid IPPrefix"...)
 	}
 
@@ -1542,7 +1542,7 @@ func (p *IPPrefix) UnmarshalText(text []byte) error {
 
 // String returns the CIDR notation of p: "<ip>/<bits>".
 func (p IPPrefix) String() string {
-	if !p.Valid() {
+	if !p.IsValid() {
 		return "invalid IPPrefix"
 	}
 	return fmt.Sprintf("%s/%d", p.ip, p.bits)
@@ -1550,7 +1550,7 @@ func (p IPPrefix) String() string {
 
 // lastIP returns the last IP in the prefix.
 func (p IPPrefix) lastIP() IP {
-	if !p.Valid() {
+	if !p.IsValid() {
 		return IP{}
 	}
 	a16 := p.ip.As16()
@@ -1625,7 +1625,7 @@ func ParseIPRange(s string) (IPRange, error) {
 		return r, fmt.Errorf("invalid To IP %q in range %q", to, s)
 	}
 	r.to = r.to.withoutZone()
-	if !r.Valid() {
+	if !r.IsValid() {
 		return r, fmt.Errorf("range %v to %v not valid", r.from, r.to)
 	}
 	return r, nil
@@ -1637,7 +1637,7 @@ func ParseIPRange(s string) (IPRange, error) {
 // separating the IPs, the same format recognized by
 // ParseIPRange.
 func (r IPRange) String() string {
-	if r.Valid() {
+	if r.IsValid() {
 		return fmt.Sprintf("%s-%s", r.from, r.to)
 	}
 	if r.from.IsZero() || r.to.IsZero() {
@@ -1669,7 +1669,7 @@ func (r IPRange) Valid() bool { return r.IsValid() }
 // If ip has an IPv6 zone, Contains returns false,
 // because IPPrefixes strip zones.
 func (r IPRange) Contains(addr IP) bool {
-	return r.Valid() && !addr.hasZone() && r.contains(addr)
+	return r.IsValid() && !addr.hasZone() && r.contains(addr)
 }
 
 // contains is like Contains, but without the validity check.
@@ -1736,7 +1736,7 @@ func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
 	for _, r := range rr[1:] {
 		prev := &out[len(out)-1]
 		switch {
-		case !r.Valid():
+		case !r.IsValid():
 			// Invalid ranges make no sense to merge, refuse to
 			// perform.
 			return nil, false
@@ -1778,8 +1778,8 @@ func mergeIPRanges(rr []IPRange) (out []IPRange, valid bool) {
 // If p and o are of different address families or either are invalid,
 // it reports false.
 func (r IPRange) Overlaps(o IPRange) bool {
-	return r.Valid() &&
-		o.Valid() &&
+	return r.IsValid() &&
+		o.IsValid() &&
 		r.from.Compare(o.to) <= 0 &&
 		o.from.Compare(r.to) <= 0
 }
@@ -1802,7 +1802,7 @@ func (r IPRange) Prefixes() []IPPrefix {
 // AppendPrefixes is an append version of IPRange.Prefixes. It appends
 // the IPPrefix entries that cover r to dst.
 func (r IPRange) AppendPrefixes(dst []IPPrefix) []IPPrefix {
-	if !r.Valid() {
+	if !r.IsValid() {
 		return nil
 	}
 	return appendRangePrefixes(dst, r.prefixFrom128AndBits, r.from.addr, r.to.addr)
@@ -1835,7 +1835,7 @@ func comparePrefixes(a, b uint128) (common uint8, aZeroBSet bool) {
 // Prefix returns r as an IPPrefix, if it can be presented exactly as such.
 // If r is not valid or is not exactly equal to one prefix, ok is false.
 func (r IPRange) Prefix() (p IPPrefix, ok bool) {
-	if !r.Valid() {
+	if !r.IsValid() {
 		return
 	}
 	if common, ok := comparePrefixes(r.from.addr, r.to.addr); ok {
