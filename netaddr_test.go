@@ -2395,6 +2395,26 @@ func TestParseIPRange(t *testing.T) {
 				t.Errorf("input %q stringifies back as %q", tt.in, back)
 			}
 		}
+
+		var r2 IPRange
+		err = r2.UnmarshalText([]byte(tt.in))
+		if err != nil {
+			got = err.Error()
+		} else {
+			got = r2
+		}
+		if got != tt.want && tt.in != "" {
+			t.Errorf("UnmarshalText(%q) = %v; want %v", tt.in, got, tt.want)
+		}
+
+		testAppendToMarshal(t, r)
+	}
+}
+
+func TestIPRangeUnmarshalTextNonZero(t *testing.T) {
+	r := MustParseIPRange("1.2.3.4-5.6.7.8")
+	if err := r.UnmarshalText([]byte("1.2.3.4-5.6.7.8")); err == nil {
+		t.Fatal("unmarshaled into non-empty IPPrefix")
 	}
 }
 
@@ -2776,12 +2796,6 @@ func TestNoAllocs(t *testing.T) {
 		}
 		return ipp
 	}
-	panicIPR := func(ipr IPRange, err error) IPRange {
-		if err != nil {
-			panic(err)
-		}
-		return ipr
-	}
 
 	test := func(name string, f func()) {
 		t.Run(name, func(t *testing.T) {
@@ -2879,17 +2893,18 @@ func TestNoAllocs(t *testing.T) {
 
 	// IPRange constructors
 	test("IPRangeFrom", func() { sinkIPRange = IPRangeFrom(IPv4(1, 2, 3, 4), IPv4(4, 3, 2, 1)) })
-	test("ParseIPRange", func() { sinkIPRange = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")) })
+	test("ParseIPRange", func() { sinkIPRange = MustParseIPRange("1.2.3.0-1.2.4.150") })
 
 	// IPRange methods
-	test("IPRange.Valid", func() { sinkBool = panicIPR(ParseIPRange("1.2.3.0-1.2.4.150")).IsValid() })
+	test("IPRange.IsZero", func() { sinkBool = MustParseIPRange("1.2.3.0-1.2.4.150").IsZero() })
+	test("IPRange.IsValid", func() { sinkBool = MustParseIPRange("1.2.3.0-1.2.4.150").IsValid() })
 	test("IPRange.Overlaps", func() {
-		a := panicIPR(ParseIPRange("1.2.3.0-1.2.3.150"))
-		b := panicIPR(ParseIPRange("1.2.4.0-1.2.4.255"))
+		a := MustParseIPRange("1.2.3.0-1.2.3.150")
+		b := MustParseIPRange("1.2.4.0-1.2.4.255")
 		sinkBool = a.Overlaps(b)
 	})
 	test("IPRange.Prefix", func() {
-		a := panicIPR(ParseIPRange("1.2.3.0-1.2.3.255"))
+		a := MustParseIPRange("1.2.3.0-1.2.3.255")
 		sinkIPPrefix = panicPfxOK(a.Prefix())
 	})
 }
@@ -2923,6 +2938,42 @@ func TestInvalidIPPortString(t *testing.T) {
 	for _, tt := range tests {
 		if got := tt.ipp.String(); got != tt.want {
 			t.Errorf("(%#v).String() = %q want %q", tt.ipp, got, tt.want)
+		}
+	}
+}
+
+func TestMethodParity(t *testing.T) {
+	// Collect all method names for each type.
+	methods := make(map[string][]reflect.Type)
+	allTypes := []reflect.Type{
+		reflect.TypeOf((*IP)(nil)),
+		reflect.TypeOf((*IPPort)(nil)),
+		reflect.TypeOf((*IPPrefix)(nil)),
+		reflect.TypeOf((*IPRange)(nil)),
+	}
+	for _, typ := range allTypes {
+		for i := 0; i < typ.NumMethod(); i++ {
+			name := typ.Method(i).Name
+			methods[name] = append(methods[name], typ)
+		}
+	}
+
+	// Check whether sufficiently common methods exist on all types.
+	ignoreList := map[string]string{
+		"Valid": "method is deprecated",
+	}
+	for name, types := range methods {
+		if _, ignore := ignoreList[name]; ignore {
+			continue // method is ignored for parity check
+		}
+		if !(len(allTypes)/2 < len(types) && len(types) < len(allTypes)) {
+			continue // either too unique or all types already have that method
+		}
+		for _, typ := range allTypes {
+			if _, ok := typ.MethodByName(name); ok {
+				continue // this type already has this method
+			}
+			t.Errorf("%v.%v is missing", typ.Elem().Name(), name)
 		}
 	}
 }
