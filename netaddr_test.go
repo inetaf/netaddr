@@ -363,9 +363,17 @@ func TestIPMarshalUnmarshalBinary(t *testing.T) {
 	}
 
 	// Cannot unmarshal into a non-zero IP
-	ip := MustParseIP("1.2.3.4")
-	if err := ip.UnmarshalBinary([]byte{1, 1, 1, 1}); err == nil {
+	ip1 := MustParseIP("1.2.3.4")
+	if err := ip1.UnmarshalBinary([]byte{1, 1, 1, 1}); err == nil {
 		t.Fatal("unmarshaled into non-empty IP")
+	}
+
+	// Cannot unmarshal from unexpected IP length.
+	for _, l := range []int{3, 5} {
+		var ip2 IP
+		if err := ip2.UnmarshalBinary(bytes.Repeat([]byte{1}, l)); err == nil {
+			t.Fatalf("unmarshaled from unexpected IP length %d", l)
+		}
 	}
 }
 
