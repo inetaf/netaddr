@@ -175,7 +175,7 @@ func (err parseIPError) Error() string {
 }
 
 // parseIPv4 parses s as an IPv4 address (in form "192.168.0.1").
-func parseIPv4(s string) (ip IP, err error) {
+func parseIPv4(s string) (IP, error) {
 	var fields [3]uint8
 	var val, pos int
 	for i := 0; i < len(s); i++ {
@@ -359,7 +359,7 @@ func parseIPv6(in string) (IP, error) {
 // the standard library's ParseIP: https://play.golang.org/p/qdjylUkKWxl.
 // To convert a standard library IP without the implicit unmapping, use
 // FromStdIPRaw.
-func FromStdIP(std net.IP) (ip IP, ok bool) {
+func FromStdIP(std net.IP) (IP, bool) {
 	ret, ok := FromStdIPRaw(std)
 	if ret.Is4in6() {
 		ret.z = z4
@@ -371,7 +371,7 @@ func FromStdIP(std net.IP) (ip IP, ok bool) {
 // If std is invalid, ok is false.
 // Unlike FromStdIP, FromStdIPRaw does not do an implicit Unmap if
 // len(std) == 16 and contains an IPv6-mapped IPv4 address.
-func FromStdIPRaw(std net.IP) (ip IP, ok bool) {
+func FromStdIPRaw(std net.IP) (IP, bool) {
 	switch len(std) {
 	case 4:
 		return IPv4(std[0], std[1], std[2], std[3]), true
@@ -1221,16 +1221,15 @@ func (p *IPPort) UnmarshalText(text []byte) error {
 
 // FromStdAddr maps the components of a standard library TCPAddr or
 // UDPAddr into an IPPort.
-func FromStdAddr(stdIP net.IP, port int, zone string) (_ IPPort, ok bool) {
+func FromStdAddr(stdIP net.IP, port int, zone string) (IPPort, bool) {
 	ip, ok := FromStdIP(stdIP)
 	if !ok || port < 0 || port > math.MaxUint16 {
-		return
+		return IPPort{}, false
 	}
 	ip = ip.Unmap()
 	if zone != "" {
 		if ip.Is4() {
-			ok = false
-			return
+			return IPPort{}, false
 		}
 		ip = ip.WithZone(zone)
 	}
@@ -1315,7 +1314,7 @@ func (p IPPrefix) IsSingleIP() bool { return p.bits != 0 && p.bits == p.ip.BitLe
 
 // FromStdIPNet returns an IPPrefix from the standard library's IPNet type.
 // If std is invalid, ok is false.
-func FromStdIPNet(std *net.IPNet) (prefix IPPrefix, ok bool) {
+func FromStdIPNet(std *net.IPNet) (IPPrefix, bool) {
 	ip, ok := FromStdIP(std.IP)
 	if !ok {
 		return IPPrefix{}, false
@@ -1892,14 +1891,14 @@ func comparePrefixes(a, b uint128) (common uint8, aZeroBSet bool) {
 
 // Prefix returns r as an IPPrefix, if it can be presented exactly as such.
 // If r is not valid or is not exactly equal to one prefix, ok is false.
-func (r IPRange) Prefix() (p IPPrefix, ok bool) {
+func (r IPRange) Prefix() (IPPrefix, bool) {
 	if !r.IsValid() {
-		return
+		return IPPrefix{}, false
 	}
 	if common, ok := comparePrefixes(r.from.addr, r.to.addr); ok {
 		return r.prefixFrom128AndBits(r.from.addr, common), true
 	}
-	return
+	return IPPrefix{}, false
 }
 
 func appendRangePrefixes(dst []IPPrefix, makePrefix prefixMaker, a, b uint128) []IPPrefix {
