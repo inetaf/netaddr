@@ -129,8 +129,18 @@ func checkBinaryMarshaller(x encoding.BinaryMarshaler) {
 	}
 }
 
+// fuzzAppendMarshaler is identical to appendMarshaler, defined in netaddr_test.go.
+// We have two because the two go-fuzz implementations differ
+// in whether they include _test.go files when typechecking.
+// We need this fuzz file to compile with and without netaddr_test.go,
+// which means defining the interface twice.
+type fuzzAppendMarshaler interface {
+	encoding.TextMarshaler
+	AppendTo([]byte) []byte
+}
+
 // checkTextMarshalMatchesAppendTo checks that x's MarshalText matches x's AppendTo.
-func checkTextMarshalMatchesAppendTo(x appendMarshaler) {
+func checkTextMarshalMatchesAppendTo(x fuzzAppendMarshaler) {
 	buf, err := x.MarshalText()
 	if err != nil {
 		panic(err)
@@ -184,7 +194,7 @@ func checkEncoding(x interface{}) {
 	if bm, ok := x.(encoding.BinaryMarshaler); ok {
 		checkBinaryMarshaller(bm)
 	}
-	if am, ok := x.(appendMarshaler); ok {
+	if am, ok := x.(fuzzAppendMarshaler); ok {
 		checkTextMarshalMatchesAppendTo(am)
 	}
 }
