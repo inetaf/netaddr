@@ -5,6 +5,7 @@
 package netaddr
 
 import (
+	"errors"
 	"fmt"
 	"runtime"
 	"sort"
@@ -330,6 +331,81 @@ type IPSet struct {
 	// ranges, no contiguous ranges). The implementation of various
 	// methods rely on this property.
 	rr []IPRange
+}
+
+// ParseIPSet parses a comma-separated list of IP ranges into an IPSet.
+// If an invalid IPRange is provided, an empty IPSet and an error are returned.
+// The provided list need not be representative of a true set; ranges may
+// overlap and duplicates are allowed.
+// An empty string produces an empty set.
+func ParseIPSet(s string) (*IPSet, error) {
+	var b IPSetBuilder
+	if len(s) == 0 {
+		return b.IPSet()
+	}
+	rss := strings.Split(s, ",")
+	for _, rs := range rss {
+		r, err := ParseIPRange(rs)
+		if err != nil {
+			return nil, fmt.Errorf("invalid IP range %q: %s", rs, err)
+		}
+		b.AddRange(r)
+	}
+	ips, err := b.IPSet()
+	if err != nil {
+		return nil, err
+	}
+	return ips, nil
+}
+
+// MustParseIPSet calls ParseIPSet(s) and panics if an error is encountered.
+func MustParseIPSet(s string) *IPSet {
+	ret, err := ParseIPSet(s)
+	if err != nil {
+		panic(err)
+	}
+	return ret
+}
+
+// String returns a string representation of the IPSet.
+func (s IPSet) String() string {
+	var b strings.Builder
+	var buf []byte
+	for i, r := range s.rr {
+		buf = r.AppendTo(buf[:0])
+		b.Write(buf)
+		if len(s.rr)-1 > i {
+			b.WriteByte(',')
+		}
+	}
+	return b.String()
+}
+
+// MarshalText implements the encoding.TextMarshaler interface.
+// The encoding matches String.
+func (s IPSet) MarshalText() ([]byte, error) {
+	var b []byte
+	for i, r := range s.rr {
+		b = r.AppendTo(b)
+		if len(s.rr)-1 > i {
+			b = append(b, ',')
+		}
+	}
+	return b, nil
+}
+
+// UnmarshalText implements the encoding.TextUnmarshaler interface.
+// The provided value is expected to be valid input for ParseIPSet.
+// UnmarshalText returns an error if the receiver is not an empty set.
+func (s *IPSet) UnmarshalText(text []byte) error {
+	if len(s.rr) != 0 {
+		return errors.New("refusing to unmarshal text into non-zero IPSet")
+	}
+	val, err := ParseIPSet(string(text))
+	if err == nil {
+		*s = *val
+	}
+	return err
 }
 
 // Ranges returns the minimum and sorted set of IP
