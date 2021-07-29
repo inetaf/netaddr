@@ -1004,7 +1004,7 @@ func (ip IP) MarshalText() ([]byte, error) {
 // It returns an error if *ip is not the IP zero value.
 func (ip *IP) UnmarshalText(text []byte) error {
 	if ip.z != z0 {
-		return errors.New("netaddr: refusing to Unmarshal into non-zero IP")
+		return errors.New("refusing to Unmarshal into non-zero IP")
 	}
 	if len(text) == 0 {
 		return nil
@@ -1035,7 +1035,7 @@ func (ip IP) MarshalBinary() ([]byte, error) {
 // UnmarshalBinary implements the encoding.BinaryUnmarshaler interface.
 func (ip *IP) UnmarshalBinary(b []byte) error {
 	if ip.z != z0 {
-		return errors.New("netaddr: refusing to Unmarshal into non-zero IP")
+		return errors.New("refusing to Unmarshal into non-zero IP")
 	}
 	n := len(b)
 	switch {
@@ -1051,7 +1051,7 @@ func (ip *IP) UnmarshalBinary(b []byte) error {
 		*ip = ipv6Slice(b[:16]).WithZone(string(b[16:]))
 		return nil
 	}
-	return fmt.Errorf("netaddr: unexpected ip size: %v", len(b))
+	return fmt.Errorf("unexpected ip size: %v", len(b))
 }
 
 // IPPort is an IP and a port number.
@@ -1209,7 +1209,7 @@ func (p IPPort) MarshalText() ([]byte, error) {
 // value.
 func (p *IPPort) UnmarshalText(text []byte) error {
 	if p.ip.z != z0 || p.port != 0 {
-		return errors.New("netaddr: refusing to Unmarshal into non-zero IPPort")
+		return errors.New("refusing to Unmarshal into non-zero IPPort")
 	}
 	if len(text) == 0 {
 		return nil
@@ -1528,7 +1528,7 @@ func (p IPPrefix) MarshalText() ([]byte, error) {
 // It returns an error if *p is not the IPPrefix zero value.
 func (p *IPPrefix) UnmarshalText(text []byte) error {
 	if *p != (IPPrefix{}) {
-		return errors.New("netaddr: refusing to Unmarshal into non-zero IPPrefix")
+		return errors.New("refusing to Unmarshal into non-zero IPPrefix")
 	}
 	if len(text) == 0 {
 		return nil
@@ -1692,7 +1692,7 @@ func (r IPRange) MarshalText() ([]byte, error) {
 // It returns an error if *r is not the IPRange zero value.
 func (r *IPRange) UnmarshalText(text []byte) error {
 	if *r != (IPRange{}) {
-		return errors.New("netaddr: refusing to Unmarshal into non-zero IPRange")
+		return errors.New("refusing to Unmarshal into non-zero IPRange")
 	}
 	if len(text) == 0 {
 		return nil
