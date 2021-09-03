@@ -32,5 +32,9 @@ jobs:
         go mod tidy
         git diff --exit-code
 
+    - name: Check formatting
+      if: matrix.go-version == '1.17'
+      run: diff -u <(echo -n) <(gofmt -d .)
+
     - name: Run tests on linux
       run: go test ./...
