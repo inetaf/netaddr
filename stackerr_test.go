@@ -18,7 +18,7 @@ import (
 func TestStacktraceErr(t *testing.T) {
 	b := new(netaddr.IPSetBuilder)
 //line ipp.go:1
-	b.AddPrefix(netaddr.IPPrefixFrom(netaddr.IPv4(1,2,3,4), 33))
+	b.AddPrefix(netaddr.IPPrefixFrom(netaddr.IPv4(1, 2, 3, 4), 33))
 //line r.go:2
 	b.AddRange(netaddr.IPRange{})
 	_, err := b.IPSet()
