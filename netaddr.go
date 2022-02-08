@@ -953,6 +953,28 @@ func (ip IP) appendTo6(ret []byte) []byte {
 	return ret
 }
 
+// StringMapped is like String but IPv4 mapped IPv6 addresses the IPv4 part is
+// written as dotted decimal.
+// For example, "::ffff:c000:0202" becomes "::ffff:192.0.2.2".
+func (ip IP) StringMapped() string {
+	if !ip.Is4in6() {
+		return ip.String()
+	}
+
+	const size = len("::ffff:255.255.255.255")
+	ret := make([]byte, 0, size)
+	ret = append(ret, "::ffff:"...)
+	for i := uint8(12); i < 16; i++ {
+		if i > 12 {
+			ret = append(ret, '.')
+		}
+
+		ret = append(ret, strconv.Itoa(int(ip.v6(i)))...)
+	}
+
+	return string(ret)
+}
+
 // StringExpanded is like String but IPv6 addresses are expanded with leading
 // zeroes and no "::" compression. For example, "2001:db8::1" becomes
 // "2001:0db8:0000:0000:0000:0000:0000:0001".

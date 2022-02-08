@@ -902,6 +902,45 @@ func TestIPStringExpanded(t *testing.T) {
 	}
 }
 
+func TestIPStringMapped(t *testing.T) {
+	tests := []struct {
+		ip IP
+		s  string
+	}{
+		{
+			ip: IP{},
+			s:  "zero IP",
+		},
+		{
+			ip: mustIP("192.0.2.1"),
+			s:  "192.0.2.1",
+		},
+		{
+			ip: mustIP("2001:db8::1"),
+			s:  "2001:db8::1",
+		},
+		{
+			ip: mustIP("2001:db8::1%eth0"),
+			s:  "2001:db8::1%eth0",
+		},
+		{
+			ip: mustIP("::ffff:c000:0200"),
+			s:  "::ffff:192.0.2.0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.ip.String(), func(t *testing.T) {
+			want := tt.s
+			got := tt.ip.StringMapped()
+
+			if got != want {
+				t.Fatalf("got %s, want %s", got, want)
+			}
+		})
+	}
+}
+
 func TestIPPrefixMasking(t *testing.T) {
 	type subtest struct {
 		ip   IP
