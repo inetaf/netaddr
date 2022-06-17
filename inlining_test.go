@@ -84,7 +84,6 @@ func TestInlining(t *testing.T) {
 		"IPPrefix.Bits",
 		"IPRange.Prefixes",
 		"IPRange.prefixFrom128AndBits",
-		"IPRange.prefixFrom128AndBits-fm",
 		"IPRange.entirelyBefore",
 		"IPRangeFrom",
 		"IPRange.To",
