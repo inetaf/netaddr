@@ -744,3 +744,98 @@ func TestIPSetEqual(t *testing.T) {
 	b.Remove(MustParseIP("1.1.1.3"))
 	assertEqual(true)
 }
+
+func TestParseIPSet(t *testing.T) {
+	tests := []struct {
+		in   string
+		want interface{}
+	}{
+		{"", &IPSet{}},
+		{"asdf", `invalid IP range "asdf": no hyphen in range "asdf"`},
+		{"::1-", `invalid IP range "::1-": invalid To IP "" in range "::1-"`},
+		{"::2-::1", `invalid IP range "::2-::1": range ::2 to ::1 not valid`},
+		{",::1-::2", `invalid IP range "": no hyphen in range ""`},
+		{"::1-::2,", `invalid IP range "": no hyphen in range ""`},
+		{
+			"::1-::2",
+			&IPSet{
+				rr: []IPRange{IPRange{mustIP("::1"), mustIP("::2")}},
+			},
+		},
+		{
+			"::1-::2,::1-::2,::1-::2",
+			&IPSet{
+				rr: []IPRange{IPRange{mustIP("::1"), mustIP("::2")}},
+			},
+		},
+		{
+			"::1-::2,::3-::4,::5-::6",
+			&IPSet{
+				rr: []IPRange{IPRange{mustIP("::1"), mustIP("::6")}},
+			},
+		},
+		{
+			"::1-::2,1.2.3.4-1.2.3.5,::2-::3,1.2.3.5-1.2.3.6",
+			&IPSet{
+				rr: []IPRange{
+					IPRange{mustIP("1.2.3.4"), mustIP("1.2.3.6")},
+					IPRange{mustIP("::1"), mustIP("::3")},
+				},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		s, err := ParseIPSet(tt.in)
+		if err != nil {
+			if err.Error() != tt.want {
+				t.Errorf("ParseIPSet(%q) = %s; want %s", tt.in, err, tt.want)
+			}
+		} else {
+			expectedIPSet, ok := tt.want.(*IPSet)
+			if !ok || !s.Equal(expectedIPSet) {
+				t.Errorf("ParseIPSet(%q) = %v; want %v", tt.in, s, tt.want)
+			} else {
+				// Stringify, re-parse, and check for equality.
+				ss := s.String()
+				s2, err := ParseIPSet(ss)
+				if err != nil || !s2.Equal(s) {
+					t.Errorf("ParseIPSet(%s) = %v; want %v", ss, s2, s)
+				}
+			}
+		}
+
+		var (
+			s2 IPSet
+			s3 IPSet
+		)
+		err = s2.UnmarshalText([]byte(tt.in))
+		if err != nil {
+			if err.Error() != tt.want {
+				t.Errorf("IPSet.UnmarshalText(%q) = %s; want %s", tt.in, err, tt.want)
+			}
+		} else {
+			expectedIPSet, ok := tt.want.(*IPSet)
+			if !ok || !s2.Equal(expectedIPSet) {
+				t.Errorf("IPSet.UnmarshalText(%q) = %v; want %v", tt.in, s2, tt.want)
+			} else {
+				// Marshal to text, unmarshal the result, and check for equality.
+				sb, err := s2.MarshalText()
+				if err != nil {
+					t.Errorf("IPSet.MarshalText(%v) unexpected error: %s", s2, err)
+				}
+				err = s3.UnmarshalText(sb)
+				if err != nil || !s3.Equal(&s2) {
+					t.Errorf("IPSet.UnmarshalText(%s) = %v; want %v", sb, s3, s2)
+				}
+			}
+		}
+	}
+
+	// Ensure UnmarshalText cannot operate on a non-zero IPSet.
+	s4 := &IPSet{rr: []IPRange{IPRange{mustIP("::1"), mustIP("::2")}}}
+	err := s4.UnmarshalText([]byte("::1-::1"))
+	if err.Error() != "refusing to unmarshal text into non-zero IPSet" {
+		t.Errorf("IPSet.UnmarshalText unmarshaled into non-empty IPSet")
+	}
+}
